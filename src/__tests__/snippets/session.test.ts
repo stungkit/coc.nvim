@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import path from 'path'
 import { Position, Range, TextEdit } from 'vscode-languageserver-protocol'
 import { UltiSnippetContext } from '../../snippets/eval'
@@ -361,8 +361,9 @@ describe('SnippetSession', () => {
       await session.start('${1:foo} bar$0', defaultRange)
       await nvim.input('<backspace>')
       await session.forceSynchronize()
-      let col = await nvim.call('col', ['.'])
-      expect(col).toBe(5)
+      await helper.waitValue(async () => {
+        return await nvim.call('col', ['.'])
+      }, 5)
     })
 
     it('should prefer range contains current cursor', async () => {

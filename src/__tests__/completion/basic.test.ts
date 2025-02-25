@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { CancellationToken, Disposable, Position, TextEdit } from 'vscode-languageserver-protocol'
 import commands from '../../commands'
 import completion, { Completion } from '../../completion'
@@ -837,7 +837,6 @@ describe('completion', () => {
       await create(['foo', 'fbi'], true)
       await nvim.input('fo')
       await helper.waitValue(() => completion.activeItems.length, 1)
-      await helper.wait(10)
       await nvim.input('<backspace>')
       await helper.waitValue(() => completion.activeItems.length, 2)
     })

@@ -1,6 +1,6 @@
-import { Buffer, Neovim } from '../../neovim'
+import { Buffer, Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
-import os from 'os'
+import { tmpdir } from 'os'
 import path from 'path'
 import { CancellationToken, CancellationTokenSource, Disposable, Position, Range, SemanticTokensLegend, TextEdit } from 'vscode-languageserver-protocol'
 import { URI } from 'vscode-uri'
@@ -14,6 +14,8 @@ import { CancellationError } from '../../util/errors'
 import window from '../../window'
 import workspace from '../../workspace'
 import helper, { createTmpFile } from '../helper'
+
+const tempDir = fs.mkdtempSync(path.join(tmpdir(), 'coc'))
 
 let nvim: Neovim
 let ns: number
@@ -428,12 +430,14 @@ describe('semanticTokens', () => {
     it('should highlight hidden buffer on shown', async () => {
       helper.updateConfiguration('semanticTokens.filetypes', ['rust'])
       registerProvider()
+      await nvim.command('edit foo')
       let code = 'fn main() {\n  println!("H"); \n}'
-      let filepath = path.join(os.tmpdir(), 'a.rs')
+      let filepath = path.join(tempDir, 'a.rs')
       fs.writeFileSync(filepath, code, 'utf8')
       let uri = URI.file(filepath).toString()
-      await workspace.loadFile(uri)
+      await workspace.loadFile(uri, '')
       let doc = workspace.getDocument(uri)
+      await nvim.command('b ' + doc.bufnr)
       let item = semanticTokens.getItem(doc.bufnr)
       let called = false
       item.onDidRefresh(() => {

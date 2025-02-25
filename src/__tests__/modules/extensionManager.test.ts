@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -156,10 +156,11 @@ describe('ExtensionManager', () => {
       workspace.workspaceFolderControl.addWorkspaceFolder(__dirname, false)
       tmpfolder = createFolder()
       let code = `exports.activate = (ctx) => {return {abs: ctx.asAbsolutePath('./foo')}}`
+      let basename = path.basename(__filename)
       createExtension(tmpfolder, {
         name: 'name',
         engines: { coc: '>= 0.0.80' },
-        activationEvents: ['workspaceContains:extensionManager.test.ts'],
+        activationEvents: ['workspaceContains:' + basename],
         contributes: {
           rootPatterns: [
             {
@@ -643,8 +644,8 @@ describe('ExtensionManager', () => {
       let manager = create(tmpfolder)
       let res = await manager.loadExtension(extFolder)
       expect(res).toBe(true)
-      let spy = jest.spyOn(workspace, 'getWatchmanPath').mockImplementation(() => {
-        return ''
+      let spy = jest.spyOn(workspace.fileSystemWatchers, 'getWatchmanPath').mockImplementation(() => {
+        return Promise.reject('not found')
       })
       let fn = async () => {
         await manager.watchExtension('name')
@@ -658,6 +659,7 @@ describe('ExtensionManager', () => {
 
     it('should reload extension on file change', async () => {
       tmpfolder = createFolder()
+      workspace.fileSystemWatchers.disabled = false
       let extFolder = path.join(tmpfolder, 'node_modules', 'name')
       createExtension(extFolder, { name: 'name', main: 'entry.js', engines: { coc: '>=0.0.1' } })
       let manager = create(tmpfolder)
@@ -672,7 +674,7 @@ describe('ExtensionManager', () => {
         fn()
         return Promise.resolve()
       })
-      let spy = jest.spyOn(Watchman, 'createClient').mockImplementation(() => {
+      let spy = jest.spyOn(workspace.fileSystemWatchers, 'createClient').mockImplementation(() => {
         return {
           dispose: () => {},
           subscribe: (_key: string, cb: Function) => {

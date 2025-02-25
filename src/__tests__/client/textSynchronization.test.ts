@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -166,6 +166,7 @@ describe('TextDocumentSynchronization', () => {
       await client.forceDocumentSync()
       await nvim.call('setline', [1, 'bar'])
       await doc.synchronize()
+      await client.forceDocumentSync()
       await helper.waitValue(() => {
         return called
       }, true)
