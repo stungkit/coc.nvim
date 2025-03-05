@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from './neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { CallHierarchyItem, CodeAction, CodeActionKind, InsertTextMode, Range, WorkspaceSymbol } from 'vscode-languageserver-types'
 import commandManager from './commands'
 import completion, { Completion } from './completion'
@@ -13,13 +13,11 @@ import listManager from './list/manager'
 import { createLogger } from './logger'
 import services from './services'
 import snippetManager from './snippets/manager'
-import { UltiSnippetOption } from './types'
+import { HoverTarget, UltiSnippetOption } from './types'
 import { Disposable, disposeAll, getConditionValue } from './util'
 import window from './window'
 import workspace, { Workspace } from './workspace'
 const logger = createLogger('plugin')
-
-export type HoverTarget = 'float' | 'preview' | 'echo'
 
 export default class Plugin {
   private ready = false

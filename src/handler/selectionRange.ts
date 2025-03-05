@@ -1,5 +1,5 @@
 'use strict'
-import type { Neovim } from '../neovim'
+import type { Neovim } from '@chemzqm/neovim'
 import { Position, Range, SelectionRange } from 'vscode-languageserver-types'
 import languages, { ProviderName } from '../languages'
 import { isFalsyOrEmpty } from '../util/array'
@@ -17,10 +17,9 @@ export default class SelectionRangeHandler {
     let { doc, position } = await this.handler.getCurrentState()
     this.handler.checkProvider(ProviderName.SelectionRange, doc.textDocument)
     await doc.synchronize()
-    let selectionRanges: SelectionRange[] = await this.handler.withRequestToken('selection ranges', token => {
+    return await this.handler.withRequestToken('selection ranges', token => {
       return languages.getSelectionRanges(doc.textDocument, [position], token)
     })
-    return selectionRanges
   }
 
   public async selectRange(visualmode: string, forward: boolean): Promise<boolean> {

@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { InlayHintKind, Range } from 'vscode-languageserver-types'
 import events from '../../events'
 import languages, { ProviderName } from '../../languages'
@@ -123,16 +123,29 @@ export default class InlayHintBuffer implements SyncItem {
     return enable === true
   }
 
-  public toggle(): void {
+  public enable() {
+    this.checkState()
+    this.config.display = true
+    void this.renderRange()
+  }
+
+  public disable() {
+    this.checkState()
+    this.config.display = false
+    this.clearCache()
+    this.clearVirtualText()
+  }
+
+  private checkState(): void {
     if (!languages.hasProvider(ProviderName.InlayHint, this.doc.textDocument)) throw new Error('Inlay hint provider not found for current document')
     if (!this.configEnabled) throw new Error(`Filetype "${this.doc.filetype}" not enabled by inlayHint configuration`)
+  }
+
+  public toggle(): void {
     if (this.config.display) {
-      this.config.display = false
-      this.clearCache()
-      this.clearVirtualText()
+      this.disable()
     } else {
-      this.config.display = true
-      void this.renderRange()
+      this.enable()
     }
   }
 

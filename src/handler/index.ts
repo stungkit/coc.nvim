@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { CodeAction, CodeActionKind, Location, Position, Range, SymbolKind } from 'vscode-languageserver-types'
 import { URI } from 'vscode-uri'
 import commands from '../commands'
@@ -137,6 +137,12 @@ export default class Handler implements HandlerDelegate {
       id: ['workbench.action.reloadWindow', 'editor.action.restart'],
       execute: () => {
         this.nvim.command('CocRestart', true)
+      }
+    }, true)
+    commands.register({
+      id: 'workbench.action.openSettingsJson',
+      execute: () => {
+        this.nvim.command('CocConfig', true)
       }
     }, true)
 

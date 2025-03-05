@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { v4 as uuid } from 'uuid'
 import { writeHeapSnapshot } from 'v8'
 import { Location } from 'vscode-languageserver-types'
@@ -46,6 +46,12 @@ export default class WorkspaceHandler {
         await workspace.jumpTo(loc.uri, loc.range.start, openCommand)
       }
     }, true)
+    commands.register({
+      id: 'workspace.openLocalConfig',
+      execute: async () => {
+        await this.openLocalConfig()
+      }
+    }, false, 'Open config file of current workspace folder')
     commands.register({
       id: 'workspace.undo',
       execute: async () => {
@@ -127,7 +133,7 @@ export default class WorkspaceHandler {
    * Open local config file
    */
   public async openLocalConfig(): Promise<void> {
-    let fsPath = await this.nvim.call('expand', ['%:p']) as string
+    let fsPath = await this.nvim.call('coc#util#get_fullpath', []) as string
     let filetype = await this.nvim.eval('&filetype') as string
     if (!fsPath || !path.isAbsolute(fsPath)) {
       void window.showWarningMessage(`Current buffer doesn't have valid file path.`)
@@ -156,7 +162,7 @@ export default class WorkspaceHandler {
 
   public async renameCurrent(): Promise<void> {
     let { nvim } = this
-    let oldPath = await nvim.call('expand', ['%:p']) as string
+    let oldPath = await nvim.call('coc#util#get_fullpath', []) as string
     let newPath = await nvim.callAsync('coc#util#with_callback', ['input', ['New path: ', oldPath, 'file']]) as string
     newPath = newPath.trim()
     if (newPath === oldPath || !newPath) return

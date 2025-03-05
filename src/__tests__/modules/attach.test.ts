@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import events from '../../events'
 import helper from '../helper'
 import workspace from '../../workspace'
@@ -90,17 +90,6 @@ describe('request', () => {
 })
 
 describe('attach', () => {
-  it('should do path replace', () => {
-    pathReplace(undefined)
-    pathReplace({})
-    nvim.emit('notification', 'VimEnter', [{
-      '/foo': '/foo/bar'
-    }])
-    let filepath = URI.file('/foo/home').fsPath
-    expect(filepath).toBe('/foo/bar/home')
-    pathReplace({ '/foo': '/foo' })
-  })
-
   it('should not throw on event handler error', async () => {
     events.on('CursorHold', () => {
       throw new Error('error')

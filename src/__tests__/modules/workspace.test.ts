@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -110,6 +110,10 @@ describe('workspace methods', () => {
     expect(workspace.getUri(doc.bufnr, undefined)).toBeDefined()
     expect(workspace.getUri(999, null)).toBeNull()
     expect(workspace.getUri(999)).toBe('')
+  })
+
+  it('should fixWin32unixPrefix', async () => {
+    expect(workspace.fixWin32unixFilepath('/foo')).toBe('/foo')
   })
 
   it('should get attached document', async () => {

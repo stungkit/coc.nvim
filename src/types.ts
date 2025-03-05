@@ -1,5 +1,5 @@
 'use strict'
-import type { Window } from './neovim'
+import type { Window } from '@chemzqm/neovim'
 import type { Disposable, Event } from 'vscode-languageserver-protocol'
 import type { CreateFile, DeleteFile, Diagnostic, Location, Range, RenameFile, TextDocumentEdit } from 'vscode-languageserver-types'
 import type { URI } from 'vscode-uri'
@@ -21,6 +21,8 @@ declare global {
   }
 }
 
+export type HoverTarget = 'float' | 'preview' | 'echo'
+
 export type Optional<T extends object, K extends keyof T = keyof T> = Omit<
   T,
   K
@@ -36,6 +38,12 @@ export interface Thenable<T> {
 export interface AnsiHighlight {
   span: [number, number]
   hlGroup: string
+}
+
+export interface FileWatchConfig {
+  readonly watchmanPath: string | null | undefined
+  readonly enable: boolean
+  readonly ignoredFolders: string[]
 }
 
 export interface LocationWithTarget extends Location {
@@ -148,6 +156,7 @@ export interface Env {
   readonly mode: string
   readonly apiversion: number
   readonly pumwidth: number
+  readonly unixPrefix: string
   readonly ambiguousIsNarrow: boolean
   readonly floating: boolean
   readonly sign: boolean

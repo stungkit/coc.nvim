@@ -1,12 +1,12 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { DefinitionLink, Hover, MarkedString, MarkupContent, Position, Range } from 'vscode-languageserver-types'
 import { URI } from 'vscode-uri'
 import { IConfigurationChangeEvent } from '../configuration/types'
 import languages, { ProviderName } from '../languages'
 import Document from '../model/document'
 import { TextDocumentContentProvider } from '../provider'
-import { Documentation, FloatConfig, FloatFactory } from '../types'
+import { Documentation, FloatConfig, FloatFactory, HoverTarget } from '../types'
 import { disposeAll, getConditionValue } from '../util'
 import { isFalsyOrEmpty } from '../util/array'
 import { readFileLines } from '../util/fs'
@@ -17,7 +17,6 @@ import { characterIndex } from '../util/string'
 import window from '../window'
 import workspace from '../workspace'
 import { HandlerDelegate } from './types'
-import { HoverTarget } from '../plugin'
 
 interface HoverConfig {
   target: HoverTarget
@@ -122,6 +121,8 @@ export default class HoverHandler {
     const defs = await this.handler.withRequestToken('definitionHover', token => {
       return languages.getDefinitionLinks(doc.textDocument, position, token)
     }, false)
+    // could be cancelled
+    if (defs == null) return false
     await addDefinitions(hovers, defs, doc.filetype)
     let hover = hovers.find(o => Hover.is(o) && Range.is(o.range)) as Hover | undefined
     if (hover?.range) {

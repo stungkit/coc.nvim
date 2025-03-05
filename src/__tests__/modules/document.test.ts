@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import path from 'path'
 import { Position, Range, TextEdit } from 'vscode-languageserver-protocol'
@@ -139,11 +139,11 @@ describe('LinesTextDocument', () => {
   })
 
   it('should get uri for unknown buftype', () => {
-    let res = getUri('foo', 3, '', false)
+    let res = getUri('foo', 3, '')
     expect(res).toBe('unknown:3')
-    res = getUri('foo', 3, 'terminal', false)
+    res = getUri('foo', 3, 'terminal')
     expect(res).toEqual('terminal:3')
-    res = getUri(__filename, 3, 'terminal', true)
+    res = getUri(__filename, 3, 'terminal')
     expect(URI.parse(res).fsPath).toBe(__filename)
   })
 

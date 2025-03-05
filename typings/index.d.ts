@@ -6760,6 +6760,11 @@ declare module 'coc.nvim' {
     export function executeCommand(command: 'workbench.action.reloadWindow'): Promise<void>
 
     /**
+     * Open user's coc-settings.json configuration file.
+     */
+    export function executeCommand(command: 'workbench.action.openSettingsJson'): Promise<void>
+
+    /**
      * Insert snippet at range of current buffer.
      *
      * @param edit Contains snippet text and range to replace.
@@ -8702,6 +8707,7 @@ declare module 'coc.nvim' {
 
   export namespace workspace {
     export const nvim: Neovim
+    export const isTrusted = true
     /**
      * Current buffer number, could be wrong since vim could not send autocmd as expected.
      *
@@ -8837,6 +8843,14 @@ declare module 'coc.nvim' {
      * @return A path relative to the root or the input.
      */
     export function asRelativePath(pathOrUri: string | Uri, includeWorkspaceFolder?: boolean): string
+
+    /**
+     * Returns converted unix path when the vim is built with win32unix enabled. Original fullpath is returned when the
+     * convert is not necessary.  Only needed when the fullpath is passed vim directly.
+     *
+     * @param fullpath The filepath to fix, only windows absolute filepath is fixed.
+     */
+    export function fixWin32unixFilepath(fullpath: string): string
 
     /**
      * Opens a document. Will return early if this document is already open. Otherwise
@@ -11626,6 +11640,10 @@ declare module 'coc.nvim' {
     filter?(document: { uri: string, languageId: string }, mode: 'onType' | 'onSave'): boolean
   }
 
+  export interface URIConverter {
+    (value: Uri): string
+  }
+
   export interface LanguageClientOptions {
     ignoredRootPaths?: string[]
     disableSnippetCompletion?: boolean
@@ -11643,6 +11661,10 @@ declare module 'coc.nvim' {
      * to 'utf8' if omitted.
      */
     stdioEncoding?: string
+    // converter used to decode uri.
+    uriConverter?: {
+      code2Protocol: URIConverter
+    }
     initializationOptions?: any | (() => any)
     initializationFailedHandler?: InitializationFailedHandler
     progressOnInitialization?: boolean

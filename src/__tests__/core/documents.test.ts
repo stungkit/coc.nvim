@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -107,6 +107,13 @@ describe('documents', () => {
     let uri = URI.file(path.join(__dirname, 'not_exists_file')).toString()
     res = await documents.getLine(uri, 1)
     expect(res).toBe('')
+  })
+
+  it('should convert filepath', () => {
+    Object.assign((documents as any)._env, { isCygwin: true })
+    let filepath = documents.fixUnixPrefix('C:\\Users\\Local', '/cygdrive/')
+    expect(filepath).toBe('/cygdrive/c/Users/Local')
+    Object.assign((documents as any)._env, { isCygwin: false })
   })
 
   it('should get QuickfixItem from location link', async () => {

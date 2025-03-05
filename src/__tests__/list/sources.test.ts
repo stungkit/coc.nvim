@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import fs from 'fs'
 import os from 'os'
 import { v4 as uuid } from 'uuid'
@@ -18,7 +18,7 @@ import ExtensionList, { getExtensionPrefix, getExtensionPriority, sortExtensionI
 import FolderList from '../../list/source/folders'
 import { mruScore } from '../../list/source/lists'
 import OutlineList, { contentToItems, getFilterText, loadCtagsSymbols, symbolsToListItems } from '../../list/source/outline'
-import SymbolsList, { sortSymbolItems, formatFilepath } from '../../list/source/symbols'
+import SymbolsList, { sortSymbolItems } from '../../list/source/symbols'
 import { ListArgument, ListContext, ListItem, ListOptions } from '../../list/types'
 import Document from '../../model/document'
 import services, { IServiceProvider, ServiceStat } from '../../services'
@@ -159,15 +159,6 @@ describe('formatting', () => {
 
   it('should fixWidth', () => {
     expect(fixWidth('a'.repeat(10), 2)).toBe('a.')
-  })
-
-  it('should support formatFilepath', () => {
-    global.formatFilepath = function() {
-      return ''
-    }
-    let res = formatFilepath('foo')
-    expect(res).toBe('')
-    global.formatFilepath = undefined
   })
 
   it('should sort symbols', () => {
@@ -536,11 +527,15 @@ describe('list sources', () => {
     })
 
     it('should do open action', async () => {
+      global.formatFilepath = function() {
+        return ''
+      }
       await manager.start(['--normal', 'location'])
       await manager.session.ui.ready
       await manager.doAction('open')
       let name = await nvim.eval('bufname("%")')
       expect(name).toMatch('sources.test.ts')
+      global.formatFilepath = undefined
     })
 
     it('should do quickfix action', async () => {
