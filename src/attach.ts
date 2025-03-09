@@ -1,5 +1,5 @@
 'use strict'
-import { attach, Attach, Neovim } from './neovim'
+import { attach, Attach, Neovim } from '@chemzqm/neovim'
 import { URI } from 'vscode-uri'
 import events from './events'
 import { createLogger } from './logger'
@@ -30,7 +30,7 @@ export function pathReplace(patterns: object | undefined): void {
 }
 
 export default (opts: Attach, requestApi = false): Plugin => {
-  const nvim: Neovim = attach(opts, createLogger('node-client-root'), requestApi)
+  const nvim: Neovim = attach(opts, createLogger('node-client'), requestApi)
   nvim.setVar('coc_process_pid', process.pid, true)
   nvim.setClientInfo('coc', { major: semVer.major, minor: semVer.minor, patch: semVer.patch }, 'remote', {}, {})
   const plugin = new Plugin(nvim)
@@ -48,8 +48,7 @@ export default (opts: Attach, requestApi = false): Plugin => {
   nvim.on('notification', async (method, args) => {
     switch (method) {
       case 'VimEnter': {
-        pathReplace(args[0])
-        await plugin.init(args[1])
+        await plugin.init(args[0])
         break
       }
       case 'Log': {
@@ -68,6 +67,7 @@ export default (opts: Attach, requestApi = false): Plugin => {
       case 'FloatBtnClick':
       case 'CompleteStop':
       case 'PumInsert':
+      case 'InputListSelect':
       case 'PumNavigate':
         logger.trace('Event: ', method, ...args)
         await events.fire(method, args)

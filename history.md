@@ -2,10 +2,44 @@
 
 Notable changes of coc.nvim:
 
+## 2025-03-07
+
+- Support `extensions.recommendations` configuration.
+- Support for UltiSnip options `t` `m` `s`.
+
+## 2025-03-05
+
+- Export method `workspace.fixWin32unixFilepath` for filepath convert.
+- Add commands `document.enableInlayHint` and `document.disableInlayHint`.
+- Refresh popup menu when completing incomplete sources.
+
+## 2025-03-04
+- Add VSCode command `workbench.action.openSettingsJson`.
+- Add `workspace.isTrusted` property.
+
+## 2025-03-03
+
+- Add command `workspace.openLocalConfig`.
+- Support vim built with win32unix enabled, including cygwin, git bash, WSL etc.
+
+## 2025-02-24
+
+- Configurations for file system watch, see `:h coc-config-fileSystemWatch`.
+
+## 2025-02-23
+
+- All global properties works with extensions #5222.
+- Return true or false for boolean option on vim (same as neovim).
+- Support completion sources using vim9sciprt module.
+
+## 2025-02-22
+
+- QuickPick works with vim without terminal support.
+
 ## 2025-02-21
 
 - To avoid unexpected signature help window close, signature help will be triggered after placeholder jump by default, when autocmd `CocJumpPlaceholder call CocActionAsync('showSignatureHelp')` not exists.
-- Support `global.formatFilepath` function for customize filepath displayed in symbols list.
+- Support `global.formatFilepath` function for customize filepath displayed in symbols & location list.
 
 ## 2025-02-20
 

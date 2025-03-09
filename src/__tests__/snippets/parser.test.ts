@@ -1,7 +1,7 @@
 /* eslint-disable */
 import * as assert from 'assert'
 import { EvalKind } from '../../snippets/eval'
-import { Choice, CodeBlock, ConditionString, FormatString, Marker, Placeholder, Scanner, SnippetParser, Text, TextmateSnippet, TokenType, Transform, transformEscapes, Variable } from '../../snippets/parser'
+import { Choice, CodeBlock, ConditionMarker, ConditionString, FormatString, Marker, Placeholder, Scanner, SnippetParser, Text, TextmateSnippet, TokenType, Transform, transformEscapes, Variable } from '../../snippets/parser'
 
 describe('SnippetParser', () => {
 
@@ -224,10 +224,25 @@ describe('SnippetParser', () => {
     assertText('far{{id:bern {{id2:basel}}}}boo', 'far{{id:bern {{id2:basel}}}}boo')
   })
 
+  test('Parser ConditionMarker', () => {
+    let m = new ConditionMarker(1,
+      [new Text('a '), new FormatString(1)],
+      [new Text('b '), new FormatString(2)],
+    )
+    let val = m.resolve('', ['', 'foo', 'bar'])
+    expect(val).toBe('b bar')
+    val = m.resolve('x', ['', 'foo', 'bar'])
+    expect(val).toBe('a foo')
+    m.addIfMarker(new Text('if'))
+    m.addElseMarker(new Text('else'))
+    let s = m.toTextmateString()
+    expect(s).toBe('(?1:a ${1}if:b ${2}else)')
+    expect(m.clone()).toBeDefined()
+  })
+
   test('Parser, TM text', () => {
     assertTextAndMarker('foo${1:bar}}', 'foobar}', Text, Placeholder, Text)
     assertTextAndMarker('foo${1:bar}${2:foo}}', 'foobarfoo}', Text, Placeholder, Placeholder, Text)
-
     assertTextAndMarker('foo${1:bar\\}${2:foo}}', 'foobar}foo', Text, Placeholder)
 
     let [, placeholder] = new SnippetParser().parse('foo${1:bar\\}${2:foo}}').children
@@ -489,7 +504,10 @@ describe('SnippetParser', () => {
     expect(snip.toString()).toBe('foo f_oo')
     snip = p.parse('${1:foo} ${1/^\\w//}')
     expect(snip.toString()).toBe('foo oo')
+    snip = p.parse('${1:Foo} ${1/^(\\w+)$/\\u$1 (?1:-\\l$1)/g}')
+    expect(snip.toString()).toBe('Foo Foo -foo')
   })
+
 
   test('Parser, convert ultisnips regex', () => {
     const p = new SnippetParser(true)
@@ -1081,6 +1099,12 @@ describe('SnippetParser', () => {
   test('Snippet parser freeze #53144', function() {
     let snippet = new SnippetParser().parse('${1/(void$)|(.+)/${1:?-\treturn nil;}/}')
     assertMarker(snippet, Placeholder)
+  })
+
+  test('Placeholder nestedPlaceholderCount', function() {
+    let { children } = new SnippetParser().parse('${1:foo${2:bar}}')
+    let placeholder = children[0] as Placeholder
+    assert.equal(placeholder.nestedPlaceholderCount, 1)
   })
 
   test('snippets variable not resolved in JSON proposal #52931', function() {

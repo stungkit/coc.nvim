@@ -1,5 +1,5 @@
 'use strict'
-import type { Buffer, Neovim, VirtualTextOption } from '../neovim'
+import type { Buffer, Neovim, VirtualTextOption } from '@chemzqm/neovim'
 import { Diagnostic, DiagnosticSeverity, Location, Position, TextEdit } from 'vscode-languageserver-types'
 import { URI } from 'vscode-uri'
 import events from '../events'
@@ -7,15 +7,16 @@ import { SyncItem } from '../model/bufferSync'
 import Document from '../model/document'
 import { DiagnosticWithFileType, DidChangeTextDocumentParams, Documentation, FloatFactory, HighlightItem } from '../types'
 import { getConditionValue } from '../util'
+import { stripAnsiColoring } from '../util/ansiparse'
 import { isFalsyOrEmpty } from '../util/array'
+import { path } from '../util/node'
 import { lineInRange, positionInRange } from '../util/position'
 import { Emitter, Event } from '../util/protocol'
 import window from '../window'
-import { path } from '../util/node'
 import workspace from '../workspace'
-import { adjustDiagnostics, DiagnosticConfig, formatDiagnostic, getHighlightGroup, getLocationListItem, getNameFromSeverity, getSeverityName, getSeverityType, LocationListItem, severityLevel, sortDiagnostics } from './util'
-import { stripAnsiColoring } from '../util/ansiparse'
 import { DiagnosticItem } from './manager'
+import { adjustDiagnostics, DiagnosticConfig, formatDiagnostic, getHighlightGroup, getLocationListItem, getNameFromSeverity, getSeverityName, getSeverityType, LocationListItem, severityLevel, sortDiagnostics } from './util'
+import { onUnexpectedError } from '../util/errors'
 const signGroup = 'CocDiagnostic'
 const NAMESPACE = 'diagnostic'
 // higher priority first
@@ -380,9 +381,7 @@ export class DiagnosticBuffer implements SyncItem {
           message: msg
         })
       })
-      if (link) {
-        docs.push({ filetype: 'txt', content: link })
-      }
+      if (link) docs.push({ filetype: 'txt', content: link })
     })
     await floatFactory.show(docs, this.config.floatConfig)
     return true
@@ -401,7 +400,7 @@ export class DiagnosticBuffer implements SyncItem {
       let disabledByInsert = events.insertMode && !refreshOnInsertMode
       if (disabledByInsert) return undefined
     }
-    return await nvim.call('coc#util#diagnostic_info', [bufnr, checkInsert]) as DiagnosticInfo | undefined
+    return await nvim.call('coc#util#diagnostic_info', [bufnr, checkInsert]).catch(onUnexpectedError) as DiagnosticInfo | undefined
   }
 
   /**

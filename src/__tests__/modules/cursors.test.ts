@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { Position, Range, TextEdit } from 'vscode-languageserver-types'
 import Cursors from '../../cursors'
 import CursorsSession, { surrondChanges } from '../../cursors/session'
@@ -212,6 +212,7 @@ describe('cursors', () => {
       await nvim.call('cursor', [1, 1])
       await nvim.input('<C-v>')
       await nvim.input('je')
+      await helper.wait(30)
       await cursors.select(doc.bufnr, 'range', '\x16')
       let n = await rangeCount()
       expect(n).toBe(2)

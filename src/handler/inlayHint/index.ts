@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import commands from '../../commands'
 import events from '../../events'
 import languages, { ProviderName } from '../../languages'
@@ -10,6 +10,8 @@ import window from '../../window'
 import workspace from '../../workspace'
 import { HandlerDelegate } from '../types'
 import InlayHintBuffer from './buffer'
+
+export type StateMethods = 'enable' | 'disable' | 'toggle'
 
 export default class InlayHintHandler {
   private buffers: BufferSync<InlayHintBuffer> | undefined
@@ -56,19 +58,32 @@ export default class InlayHintHandler {
     commands.register({
       id: 'document.toggleInlayHint',
       execute: (bufnr?: number) => {
-        return this.toggle(bufnr ?? workspace.bufnr)
+        this.setState('toggle', bufnr)
       },
     }, false, 'toggle inlayHint display of current buffer')
+    commands.register({
+      id: 'document.enableInlayHint',
+      execute: (bufnr?: number) => {
+        this.setState('enable', bufnr)
+      },
+    }, false, 'enable codeLens display of current buffer')
+    commands.register({
+      id: 'document.disableInlayHint',
+      execute: (bufnr?: number) => {
+        this.setState('disable', bufnr)
+      },
+    }, false, 'disable codeLens display of current buffer')
     handler.addDisposable(Disposable.create(() => {
       disposeAll(this.disposables)
     }))
   }
 
-  public toggle(bufnr: number): void {
-    let item = this.getItem(bufnr)
+  public setState(method: StateMethods, bufnr?: number): void {
     try {
+      bufnr = bufnr ?? workspace.bufnr
       workspace.getAttachedDocument(bufnr)
-      item.toggle()
+      let item = this.getItem(bufnr)
+      item[method]()
     } catch (e) {
       void window.showErrorMessage((e as Error).message)
     }

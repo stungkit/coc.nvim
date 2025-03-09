@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import path from 'path'
 import { Position, Range, TextEdit } from 'vscode-languageserver-protocol'
 import { UltiSnippetContext } from '../../snippets/eval'
@@ -361,8 +361,9 @@ describe('SnippetSession', () => {
       await session.start('${1:foo} bar$0', defaultRange)
       await nvim.input('<backspace>')
       await session.forceSynchronize()
-      let col = await nvim.call('col', ['.'])
-      expect(col).toBe(5)
+      await helper.waitValue(async () => {
+        return await nvim.call('col', ['.'])
+      }, 5)
     })
 
     it('should prefer range contains current cursor', async () => {
@@ -443,7 +444,7 @@ describe('SnippetSession', () => {
       let res = await session.start('a${1:a}b', defaultRange)
       expect(res).toBe(true)
       await buf.append(['foo', 'bar'])
-      await nvim.call('cursor', [2, 1])
+      await nvim.call('cursor', [2, 2])
       await session.checkPosition()
       expect(session.isActive).toBe(false)
     })
@@ -531,6 +532,22 @@ describe('SnippetSession', () => {
       await session.nextPlaceholder()
       let col = await nvim.call('col', '.')
       expect(col).toBe(5)
+    })
+
+    it('should remove white space on jump', async () => {
+      let session = await createSession()
+      let opts = {
+        removeWhiteSpace: true,
+        ...defaultContext
+      }
+      let res = await session.start('foo  $1\n${2:bar} $0', defaultRange, true, opts)
+      expect(res).toBe(true)
+      let line = await nvim.line
+      expect(line).toBe('foo  ')
+      await session.nextPlaceholder()
+      expect(session.isActive).toBe(true)
+      let lines = await session.document.buffer.lines
+      expect(lines[0]).toBe('foo')
     })
   })
 

@@ -3,7 +3,7 @@ import type { CompleteDoneItem, CompleteFinishKind } from './completion/types'
 import { createLogger } from './logger'
 import { JumpInfo } from './types'
 import { disposeAll } from './util'
-import { CancellationError } from './util/errors'
+import { shouldIgnore } from './util/errors'
 import * as Is from './util/is'
 import { equals } from './util/object'
 import { CancellationToken, Disposable } from './util/protocol'
@@ -74,7 +74,7 @@ export type TabEvents = 'TabNew' | 'TabClosed'
 export type AllEvents = BufEvents | EmptyEvents | CursorEvents | TaskEvents | WindowEvents | TabEvents
   | InsertChangeEvents | 'CompleteStop' | 'CompleteDone' | 'TextChanged' | 'MenuPopupChanged' | 'BufWritePost' | 'BufWritePre'
   | 'InsertCharPre' | 'FileType' | 'BufWinEnter' | 'BufWinLeave' | 'VimResized' | 'TermExit'
-  | 'DirChanged' | 'OptionSet' | 'Command' | 'BufReadCmd' | 'GlobalChange' | 'InputChar' | 'PlaceholderJump'
+  | 'DirChanged' | 'OptionSet' | 'Command' | 'BufReadCmd' | 'GlobalChange' | 'InputChar' | 'PlaceholderJump' | 'InputListSelect'
   | 'WinLeave' | 'MenuInput' | 'PromptInsert' | 'FloatBtnClick' | 'InsertSnippet' | 'TextInsert' | 'PromptKeyPress'
 
 export type CursorEvents = CursorHoldEvents | CursorMoveEvents
@@ -272,7 +272,7 @@ class Events {
     let cbs = this.handlers.get(event)
     if (cbs?.length) {
       let fns = cbs.slice()
-      let traceSlow = SYNC_AUTOCMDS.includes(event)
+      let traceSlow = this.requesting || SYNC_AUTOCMDS.includes(event)
       await Promise.allSettled(fns.map(fn => {
         let promiseFn = async () => {
           let timer: NodeJS.Timeout
@@ -285,8 +285,7 @@ class Events {
           try {
             await fn(args)
           } catch (e) {
-            let res = shouldIgnore(e)
-            if (!res) logger.error(`Error on event: ${event}`, e)
+            if (!shouldIgnore(e)) logger.error(`Error on event: ${event}`, e, fn['stack'])
           }
           clearTimeout(timer)
         }
@@ -324,27 +323,38 @@ class Events {
   public on(event: 'InputChar', handler: (session: string, character: string, mode: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'PromptInsert', handler: (value: string, bufnr: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: 'PlaceholderJump', handler: (bufnr: number, info: JumpInfo) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
+  public on(event: 'InputListSelect', handler: (index: number) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
   public on(event: EmptyEvents, handler: () => Result, thisArg?: any, disposables?: Disposable[]): Disposable
-  public on(event: AllEvents | AllEvents[], handler: (...args: unknown[]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable
-  public on(event: AllEvents[] | AllEvents, handler: (...args: any[]) => Result, thisArg?: any, disposables?: Disposable[]): Disposable {
+  public on(event: AllEvents | AllEvents[], handler: (...args: unknown[]) => Result, thisArg?: any, disposables?: Disposable[] | true): Disposable
+  public on(event: AllEvents[] | AllEvents, handler: (...args: any[]) => Result, thisArg?: any, disposables?: Disposable[] | true): Disposable {
     if (Array.isArray(event)) {
-      let arr = disposables || []
+      let arr: Disposable[] = []
       for (let ev of event) {
         this.on(ev as any, handler, thisArg, arr)
       }
-      return Disposable.create(() => {
+      let dis = Disposable.create(() => {
         disposeAll(arr)
       })
+      if (Array.isArray(disposables)) {
+        disposables.push(dis)
+      }
+      return dis
     } else {
-      let arr = this.handlers.get(event) || []
+      let arr = this.handlers.get(event) ?? []
+      let onFinish = () => {
+        if (disposables === true && disposable) disposable.dispose()
+      }
       let wrappedhandler = args => new Promise((resolve, reject) => {
         try {
           Promise.resolve(handler.apply(thisArg ?? null, args)).then(() => {
+            onFinish()
             resolve(undefined)
           }, e => {
+            onFinish()
             reject(e)
           })
         } catch (e) {
+          onFinish()
           reject(e)
         }
       })
@@ -363,11 +373,10 @@ class Events {
       return disposable
     }
   }
-}
 
-function shouldIgnore(err: any): boolean {
-  if (err instanceof CancellationError || (err instanceof Error && err.message.includes('transport disconnected'))) return true
-  return false
+  public once(event: AllEvents, handler: (...args: any[]) => Result, thisArg?: any): void {
+    this.on(event, handler, thisArg, true)
+  }
 }
 
 export default new Events()

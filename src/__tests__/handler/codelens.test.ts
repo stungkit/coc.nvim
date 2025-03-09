@@ -1,4 +1,4 @@
-import { Neovim } from '../../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { CancellationToken, CodeLens, Command, Disposable, Position, Range, TextEdit } from 'vscode-languageserver-protocol'
 import commands from '../../commands'
 import events from '../../events'
@@ -209,9 +209,9 @@ describe('codeLenes featrue', () => {
     disposables.push(languages.registerCodeLensProvider([{ language: 'javascript' }], {
       provideCodeLenses: () => {
         return [{
-          range: Range.create(90, 0, 90, 1)
+          range: Range.create(190, 0, 190, 1)
         }, {
-          range: Range.create(91, 0, 91, 1)
+          range: Range.create(191, 0, 191, 1)
         }]
       },
       resolveCodeLens: async codeLens => {
@@ -220,19 +220,18 @@ describe('codeLenes featrue', () => {
       }
     }))
     let doc = await helper.createDocument('example.js')
-    let arr = new Array(100)
+    await nvim.call('cursor', [1, 1])
+    let arr = new Array(200)
     arr.fill('')
     await nvim.call('setline', [1, arr])
     await doc.synchronize()
     await codeLens.checkProvider()
-    await nvim.command('normal! gg')
-    await nvim.command('normal! G')
-    await helper.wait(100)
-    let buf = codeLens.buffers.getItem(doc.bufnr)
-    let codelens = buf.currentCodeLens
-    expect(codelens).toBeDefined()
-    expect(codelens[0].command).toBeDefined()
-    expect(codelens[1].command).toBeDefined()
+    await nvim.command('normal! ggG')
+    let bufnr = doc.bufnr
+    await helper.waitValue(() => {
+      let buf = codeLens.buffers.getItem(bufnr)
+      return buf && buf.currentCodeLens && buf.currentCodeLens[0].command != null
+    }, true)
   })
 
   it('should use picker for multiple codeLenses', async () => {

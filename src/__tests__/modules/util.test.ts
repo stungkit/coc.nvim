@@ -113,6 +113,33 @@ console.warn('warn')`, sandbox)
     expect(fn).toBeCalledTimes(5)
   })
 
+  it('should create console', () => {
+    let res = factory.createConsole({ x: 1 }, {} as any)
+    expect(res).toEqual({ x: 1 })
+    let called = false
+    let val = 1
+    res = factory.createConsole({
+      warn: () => {
+      },
+      custom: () => {
+        val = 2
+      }
+    }, {
+      warn: () => {
+        called = true
+      }
+    } as any)
+      ; (res as any).custom()
+      ; (res as Console).warn()
+    expect(val).toBe(1)
+    expect(called).toBe(true)
+  })
+
+  it('should copy properties', () => {
+    let obj = factory.copyGlobalProperties({} as any, global)
+    expect(typeof obj['fetch']).toBe('function')
+  })
+
   it('should not throw process.chdir', () => {
     const sandbox = factory.createSandbox(logfile, emptyLogger)
     let res = vm.runInContext(`process.chdir()`, sandbox)
@@ -594,20 +621,27 @@ describe('errors', () => {
     errors.onUnexpectedError(new errors.CancellationError())
     expect(() => {
       errors.onUnexpectedError(new Error('my error'))
-    }).toThrowError()
+    }).toThrow()
     expect(() => {
       errors.onUnexpectedError('error')
-    }).toThrowError()
+    }).toThrow()
     errors.assert(true)
     expect(() => {
       errors.assert(false)
-    }).toThrowError()
+    }).toThrow()
   })
 
   it('should check CancellationError', () => {
     let err = new Error('Canceled')
     err.name = 'Canceled'
     expect(errors.isCancellationError(err)).toBe(true)
+    expect(errors.shouldIgnore(err)).toBe(true)
+  })
+
+  it('should check shouldIgnore', async () => {
+    expect(errors.shouldIgnore(new errors.CancellationError())).toBe(true)
+    let err = new Error('transport disconnected')
+    expect(errors.shouldIgnore(err)).toBe(true)
   })
 })
 

@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { Position, Range, TextEdit } from 'vscode-languageserver-types'
 import { LinesTextDocument } from '../model/textdocument'
@@ -7,7 +7,7 @@ import { defaultValue } from '../util'
 import { emptyRange, getEnd, positionInRange, rangeInRange } from '../util/position'
 import { CancellationToken } from '../util/protocol'
 import { getChangedPosition } from '../util/textedit'
-import { prepareMatchCode, preparePythonCodes, UltiSnippetContext } from './eval'
+import { prepareMatchCode, preparePythonCodes, SnippetFormatOptions, UltiSnippetContext } from './eval'
 import * as Snippets from "./parser"
 import { VariableResolver } from './parser'
 
@@ -23,6 +23,7 @@ export interface CocSnippetPlaceholder {
   before: string
   // snippet text after
   after: string
+  nestCount: number
 }
 
 export class CocSnippet {
@@ -97,11 +98,18 @@ export class CocSnippet {
   }
 
   public getSortedPlaceholders(curr?: CocSnippetPlaceholder | undefined): CocSnippetPlaceholder[] {
-    let res = curr ? [curr] : []
-    let arr = this._placeholders.filter(o => o !== curr && !o.transform)
+    let finalPlaceholder: CocSnippetPlaceholder
+    const arr: CocSnippetPlaceholder[] = []
+    this._placeholders.forEach(p => {
+      if (p === curr || p.transform) return
+      if (p.index === 0) {
+        finalPlaceholder = p
+        return
+      }
+      arr.push(p)
+    })
     arr.sort(comparePlaceholder)
-    res.push(...arr)
-    return res
+    return [curr, ...arr, finalPlaceholder].filter(o => o != null)
   }
 
   public get hasPython(): boolean {
@@ -261,6 +269,7 @@ export class CocSnippet {
         character: position.line == 0 ? character + position.character : position.character
       }
       let index: number
+      let nestCount = 0
       if (p instanceof Snippets.Variable) {
         let key = p.name
         if (variableIndexMap.has(key)) {
@@ -272,12 +281,14 @@ export class CocSnippet {
         }
       } else {
         index = p.index
+        nestCount = p.nestedPlaceholderCount
       }
       const value = p.toString()
       const end = getEnd(position, value)
       let res: CocSnippetPlaceholder = {
         index,
         value,
+        nestCount,
         marker: p,
         transform: !!p.transform,
         range: Range.create(start, getEnd(start, value)),
@@ -435,20 +446,22 @@ export function getParts(text: string, range: Range, r: Range): [string, string]
   return [before.join('\n'), after.join('\n')]
 }
 
-export function normalizeSnippetString(snippet: string, indent: string, opts: { tabSize: number, insertSpaces: boolean }): string {
+export function normalizeSnippetString(snippet: string, indent: string, opts: SnippetFormatOptions): string {
   let lines = snippet.split(/\r?\n/)
   let ind = opts.insertSpaces ? ' '.repeat(opts.tabSize) : '\t'
   let tabSize = defaultValue(opts.tabSize, 2)
+  let noExpand = opts.noExpand
+  let trimTrailingWhitespace = opts.trimTrailingWhitespace
   lines = lines.map((line, idx) => {
     let space = line.match(/^\s*/)[0]
     let pre = space
     let isTab = space.startsWith('\t')
-    if (isTab && opts.insertSpaces) {
+    if (isTab && opts.insertSpaces && !noExpand) {
       pre = ind.repeat(space.length)
     } else if (!isTab && !opts.insertSpaces) {
       pre = ind.repeat(space.length / tabSize)
     }
-    return (idx == 0 || line.length == 0 ? '' : indent) + pre + line.slice(space.length)
+    return (idx == 0 || (trimTrailingWhitespace && line.length == 0) ? '' : indent) + pre + line.slice(space.length)
   })
   return lines.join('\n')
 }
@@ -459,8 +472,9 @@ export function shouldFormat(snippet: string): boolean {
   return false
 }
 
-export function comparePlaceholder(a: { primary: boolean, index: number }, b: { primary: boolean, index: number }): number {
+export function comparePlaceholder(a: { primary: boolean, index: number, nestCount: number }, b: { primary: boolean, index: number, nestCount: number }): number {
+  // check inner placeholder first
+  if (a.nestCount !== b.nestCount) return a.nestCount - b.nestCount
   if (a.primary !== b.primary) return a.primary ? -1 : 1
-  if (a.index == 0 || b.index == 0) return a.index == 0 ? 1 : -1
   return a.index - b.index
 }

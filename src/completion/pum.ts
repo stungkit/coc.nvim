@@ -1,4 +1,4 @@
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { CompletionItemKind } from 'vscode-languageserver-types'
 import { matchSpansReverse } from '../model/fuzzyMatch'
 import { FloatConfig, HighlightItem } from '../types'
@@ -166,7 +166,7 @@ export default class PopupMenu {
     }
     if (selectedIndex !== -1 && search.length > 0) {
       let item = items[selectedIndex]
-      if (!item.word.startsWith(search)) {
+      if (!item.word.startsWith(search) && !item.filterText.startsWith(search)) {
         selectedIndex = -1
       }
     }

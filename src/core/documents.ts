@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { FormattingOptions, Location, LocationLink, TextEdit } from 'vscode-languageserver-types'
 import { URI } from 'vscode-uri'
 import Configurations from '../configuration'
@@ -17,6 +17,7 @@ import { Disposable, Emitter, Event, TextDocumentSaveReason } from '../util/prot
 import { byteIndex } from '../util/string'
 import type { TextDocumentWillSaveEvent } from './files'
 import WorkspaceFolder from './workspaceFolder'
+import { convertFormatOptions, VimFormatOption } from '../util/convert'
 const logger = createLogger('core-documents')
 
 interface StateInfo {
@@ -218,6 +219,8 @@ export default class Documents implements Disposable {
           return val
         }
         switch (name) {
+          case 'tmpdir':
+            return os.tmpdir()
           case 'userHome':
             return os.homedir()
           case 'workspace':
@@ -351,15 +354,15 @@ export default class Documents implements Disposable {
    * Get format options
    */
   public async getFormatOptions(uri?: string): Promise<FormattingOptions> {
-    let doc: Document
-    if (uri) doc = this.getDocument(uri)
-    let bufnr = doc ? doc.bufnr : 0
-    let res = await this.nvim.call('coc#util#get_format_opts', [bufnr]) as any
-    let obj: FormattingOptions = { tabSize: res.tabsize, insertSpaces: res.expandtab == 1 }
-    obj.insertFinalNewline = res.insertFinalNewline == 1
-    if (res.trimTrailingWhitespace) obj.trimTrailingWhitespace = true
-    if (res.trimFinalNewlines) obj.trimFinalNewlines = true
-    return obj
+    let bufnr = this.getBufnr(uri)
+    let res = await this.nvim.call('coc#util#get_format_opts', [bufnr]) as VimFormatOption
+    return convertFormatOptions(res)
+  }
+
+  public getBufnr(uri?: string): number {
+    if (!uri) return 0
+    let doc = this.getDocument(uri)
+    return doc ? doc.bufnr : 0
   }
 
   /**
@@ -584,6 +587,11 @@ export default class Documents implements Disposable {
     }
   }
 
+  public fixUnixPrefix(filepath: string, prefix: string): string {
+    if (!this._env.isCygwin || !/^\w:/.test(filepath)) return filepath
+    return prefix + filepath[0].toLowerCase() + filepath.slice(2).replace(/\\/g, '/')
+  }
+
   /**
    * Convert location to quickfix item.
    */
@@ -602,7 +610,7 @@ export default class Documents implements Disposable {
     let endLine = start.line == end.line ? text : await this.getLine(uri, end.line)
     let item: QuickfixItem = {
       uri,
-      filename: u.scheme == 'file' ? u.fsPath : uri,
+      filename: u.scheme == 'file' ? this.fixUnixPrefix(u.fsPath, this._env.unixPrefix) : uri,
       lnum: start.line + 1,
       end_lnum: end.line + 1,
       col: text ? byteIndex(text, start.character) + 1 : start.character + 1,

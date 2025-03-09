@@ -1,4 +1,4 @@
-import { Buffer, Neovim } from '../../neovim'
+import { Buffer, Neovim } from '@chemzqm/neovim'
 import { CodeAction, CodeActionKind, Disposable, DocumentSymbol, Range, SymbolKind, SymbolTag, TextEdit } from 'vscode-languageserver-protocol'
 import events from '../../events'
 import Symbols from '../../handler/symbols/index'
@@ -442,6 +442,8 @@ fun1() {}
       await nvim.input('p')
       let winid = await helper.waitFloat()
       await nvim.input('l')
+      // debounce for CursorMoved used
+      await helper.wait(50)
       await nvim.input('k')
       await helper.waitValue(async () => {
         let win = nvim.createWindow(winid)
@@ -537,16 +539,14 @@ fun1() {}
 
     it('should auto hide outline on clicking', async () => {
       helper.updateConfiguration('outline.autoHide', true)
-
       await createBuffer()
       await symbols.showOutline()
       await helper.waitFor('getline', [3], '    m fun1 2')
       await nvim.command('exe 3')
       await nvim.input('<cr>')
-      await helper.wait(10)
-
-      let buf = await getOutlineBuffer()
-      expect(buf).toBeUndefined()
+      await helper.waitValue(async () => {
+        return await getOutlineBuffer()
+      }, undefined)
     })
 
     it('should not throw when outline does not exist', async () => {

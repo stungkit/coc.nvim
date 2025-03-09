@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { v4 as uuid } from 'uuid'
 import { URI } from 'vscode-uri'
 import WorkspaceFolderController from '../core/workspaceFolder'
@@ -84,7 +84,7 @@ export class SnippetVariableResolver implements VariableResolver {
   private async resolveValue(name: string): Promise<string | undefined> {
     let { nvim } = this
     if (['TM_FILENAME', 'TM_FILENAME_BASE', 'TM_DIRECTORY', 'TM_FILEPATH'].includes(name)) {
-      let filepath = await nvim.eval('expand("%:p")') as string
+      let filepath = await nvim.call('coc#util#get_fullpath') as string
       if (name === 'TM_FILENAME') return path.basename(filepath)
       if (name === 'TM_FILENAME_BASE') return path.basename(filepath, path.extname(filepath))
       if (name === 'TM_DIRECTORY') return path.dirname(filepath)
@@ -123,7 +123,7 @@ export class SnippetVariableResolver implements VariableResolver {
       return uuid()
     }
     if (['RELATIVE_FILEPATH', 'WORKSPACE_NAME', 'WORKSPACE_FOLDER'].includes(name)) {
-      let filepath = await nvim.eval('expand("%:p")') as string
+      let filepath = await nvim.call('coc#util#get_fullpath') as string
       let folder = this.workspaceFolder.getWorkspaceFolder(URI.file(filepath))
       if (name === 'RELATIVE_FILEPATH') return this.workspaceFolder.getRelativePath(filepath)
       if (name === 'WORKSPACE_NAME') return folder.name

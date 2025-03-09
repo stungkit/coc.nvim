@@ -1,5 +1,5 @@
 'use strict'
-import { Neovim } from '../neovim'
+import { Neovim } from '@chemzqm/neovim'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { Position, TypeHierarchyItem } from 'vscode-languageserver-types'
 import commands from '../commands'
@@ -114,7 +114,7 @@ export default class TypeHierarchyHandler {
     return res
   }
 
-  private async prepare(doc: TextDocument, position: Position): Promise<TypeHierarchyItem[] | undefined> {
+  private async prepare(doc: TextDocument, position: Position): Promise<TypeHierarchyItem[] | undefined | null> {
     this.handler.checkProvider(ProviderName.TypeHierarchy, doc)
     return await this.handler.withRequestToken('typeHierarchy', async token => {
       return await languages.prepareTypeHierarchy(doc, position, token)

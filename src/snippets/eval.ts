@@ -1,7 +1,7 @@
 'use strict'
-import { Neovim } from '../neovim'
-import { Range } from '../neovim/types'
-import { exec } from 'child_process'
+import { Neovim } from '@chemzqm/neovim'
+import { Range } from '@chemzqm/neovim/lib/types'
+import { exec, ExecOptions } from 'child_process'
 import { isVim } from '../util/constants'
 import { promisify } from '../util/node'
 import { toText } from '../util/string'
@@ -28,6 +28,26 @@ export interface UltiSnippetContext {
    * Avoid python code eval when is true.
    */
   noPython?: boolean
+  /**
+   * Do not expand tabs
+   */
+  noExpand?: boolean
+  /**
+   * Trim all whitespaces from right side of snippet lines.
+   */
+  trimTrailingWhitespace?: boolean
+  /**
+   * Remove whitespace immediately before the cursor at the end of a line before jumping to the next tabstop
+   */
+  removeWhiteSpace?: boolean
+}
+
+export interface SnippetFormatOptions {
+  tabSize: number
+  insertSpaces: boolean
+  trimTrailingWhitespace?: boolean
+  // options from ultisnips context
+  noExpand?: boolean
 }
 
 /**
@@ -40,7 +60,9 @@ export async function evalCode(nvim: Neovim, kind: EvalKind, code: string, curr:
   }
 
   if (kind == 'shell') {
-    let res = await promisify(exec)(code)
+    let opts: ExecOptions = { windowsHide: true }
+    if (process.env.SHELL) opts.shell = process.env.shell
+    let res = await promisify(exec)(code, opts)
     return res.stdout.replace(/\s*$/, '')
   }
 
@@ -68,7 +90,7 @@ export function preparePythonCodes(snip: UltiSnippetContext): string[] {
   let { range, context, line } = snip
   let pyCodes: string[] = [
     'import re, os, vim, string, random',
-    `path = vim.eval('expand("%:p")') or ""`,
+    `path = vim.eval('coc#util#get_fullpath()') or ""`,
     `fn = os.path.basename(path)`,
   ]
   if (context) {
