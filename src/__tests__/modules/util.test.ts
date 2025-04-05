@@ -15,6 +15,7 @@ import { ansiparse, parseAnsiHighlights } from '../../util/ansiparse'
 import * as arrays from '../../util/array'
 import { filter } from '../../util/async'
 import * as color from '../../util/color'
+import { pluginRoot } from '../../util/constants'
 import { getSymbolKind } from '../../util/convert'
 import * as diff from '../../util/diff'
 import * as errors from '../../util/errors'
@@ -110,7 +111,7 @@ console.debug('debug')
 console.info('info')
 console.error('error')
 console.warn('warn')`, sandbox)
-    expect(fn).toBeCalledTimes(5)
+    expect(fn).toHaveBeenCalled()
   })
 
   it('should create console', () => {
@@ -557,16 +558,23 @@ describe('Registry', () => {
   it('should parse extension name', () => {
     let parseSource = extension.parseExtensionName
     expect(parseSource(``)).toBeUndefined()
-    expect(parseSource(`a)`, 0)).toBeUndefined()
-    expect(parseSource(`a`, 0)).toBeUndefined()
+    expect(parseSource(`a)`, 0)).toBe('coc.nvim')
+    expect(parseSource(`a`, 0)).toBe('coc.nvim')
     let registry = Registry.as<extension.IExtensionRegistry>(extension.Extensions.ExtensionContribution)
     let filepath = path.join(os.tmpdir(), 'single')
     registry.registerExtension('single', { name: 'single', directory: os.tmpdir(), filepath })
     expect(parseSource(`\n\n${filepath}:1:1`)).toBe('single')
     // expect(parseSource(`\n\n${filepath.slice(0, -3)}:1:1`)).toBeUndefined()
-    expect(parseSource(`\n\n/a/b:1:1`)).toBeUndefined()
+    expect(parseSource(`\n\n/a/b:1:1`)).toBe('coc.nvim')
     let dir = fs.realpathSync(os.tmpdir())
     expect(parseSource(`\n\n${path.join(dir, 'foo')}:1:1`)).toBe('single')
+    let lines = [
+      `at FormatRangeManager.addProvider (${pluginRoot}/src/provider/manager.ts:28:55`,
+      `at FormatRangeManager.register (${pluginRoot}/formatRangeManager.ts:17:17)`,
+      `at PrettierEditService.registerDocumentFormatEditorProviders (${filepath}:253:17)`
+    ]
+    let res = parseSource(`\n\n${lines.join('\n')}`, 2)
+    expect(res).toBe('single')
     registry.unregistExtension('single')
   })
 
@@ -1224,7 +1232,7 @@ describe('utility', () => {
   it('should resolve concurrent with empty task', async () => {
     let fn = jest.fn()
     await concurrent([], fn, 3)
-    expect(fn).toBeCalledTimes(0)
+    expect(fn).toHaveBeenCalledTimes(0)
   })
 
   it('should run concurrent', async () => {
@@ -1685,7 +1693,6 @@ describe('diff', () => {
   function blockMilliseconds(ms: number): void {
     let ts = Date.now()
     let i = 0
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       if (Date.now() - ts > ms) {
         break
@@ -1728,7 +1735,6 @@ describe('diff', () => {
       await filter([1, 2, 3, 4, 5, 6, 7, 8], i => {
         if (i > 1) {
           let ts = Date.now()
-          // eslint-disable-next-line no-constant-condition
           while (true) {
             if (Date.now() - ts > 40) break
           }

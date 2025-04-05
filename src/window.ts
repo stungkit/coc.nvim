@@ -233,7 +233,7 @@ export class Window {
    * @param token CancellationToken
    * @returns {Promise<HighlightDiff | null>}
    */
-  public async diffHighlights(bufnr: number, ns: string, items: HighlightItem[], region?: [number, number] | undefined, token?: CancellationToken): Promise<HighlightDiff | null> {
+  public async diffHighlights(bufnr: number, ns: string, items: HighlightItem[], region?: [number, number], token?: CancellationToken): Promise<HighlightDiff | null> {
     return this.highlights.diffHighlights(bufnr, ns, items, region, token)
   }
 
@@ -407,6 +407,13 @@ export class Window {
    */
   public async applyDiffHighlights(bufnr: number, ns: string, priority: number, diff: HighlightDiff, notify = false): Promise<void> {
     return this.highlights.applyDiffHighlights(bufnr, ns, priority, diff, notify)
+  }
+
+  /**
+   * Get visible ranges of bufnr with optional winid
+   */
+  public async getVisibleRanges(bufnr: number, winid?: number): Promise<[number, number][]> {
+    return await ui.getVisibleRanges(this.nvim, bufnr, winid)
   }
 
   private get configuration(): WorkspaceConfiguration {

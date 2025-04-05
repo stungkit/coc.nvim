@@ -9,6 +9,7 @@ if has('nvim')
 endif
 
 scriptencoding utf-8
+let s:listener_map = {}
 let s:funcs = {}
 let s:prop_offset = get(g:, 'coc_text_prop_offset', 1000)
 let s:namespace_id = 1
@@ -26,7 +27,7 @@ let s:boolean_options = ['allowrevins', 'arabic', 'arabicshape', 'autochdir', 'a
 " helper {{
 " Create a window with bufnr for execute win_execute
 function! s:create_popup(bufnr) abort
-  noa let id = popup_create(1, {
+  noa let id = popup_create(a:bufnr, {
       \ 'line': 1,
       \ 'col': &columns,
       \ 'maxwidth': 1,
@@ -42,10 +43,11 @@ function! s:check_bufnr(bufnr) abort
   endif
 endfunction
 
-" TextChanged not fired when using channel on vim.
+" TextChanged and callback not fired when using channel on vim.
 function! s:on_textchange(bufnr) abort
   let event = mode() ==# 'i' ? 'TextChangedI' : 'TextChanged'
   exe 'doautocmd <nomodeline> '.event.' '.bufname(a:bufnr)
+  call listener_flush(a:bufnr)
 endfunction
 
 " execute command for bufnr
@@ -97,13 +99,6 @@ function! s:tabnr_id(nr) abort
   endif
   return tid
 endfunction
-
-def s:generate_id(bufnr: number): number
-  const max: number = get(s:buffer_id, bufnr, s:prop_offset)
-  const id: number = max + 1
-  s:buffer_id[bufnr] = id
-  return id
-enddef
 
 function! s:win_execute(winid, cmd, ...) abort
   let ref = get(a:000, 0, v:null)
@@ -535,13 +530,7 @@ function! s:funcs.buf_get_mark(bufnr, name)
   return [line("'" . a:name), col("'" . a:name) - 1]
 endfunction
 
-def s:funcs.buf_add_highlight(bufnr: number, srcId: number, hlGroup: string, line: number, colStart: number, colEnd: number, ...optionalArguments: list<dict<any>>): any
-    const opts: dict<any> = get(optionalArguments, 0, {})
-    return coc#api#funcs_buf_add_highlight(bufnr, srcId, hlGroup, line, colStart, colEnd, opts)
-enddef
-
-" To be called directly for better performance
-def coc#api#funcs_buf_add_highlight(bufnr: number, srcId: number, hlGroup: string, line: number, colStart: number, colEnd: number, propTypeOpts: dict<any> = {}): any
+def s:funcs.buf_add_highlight(bufnr: number, srcId: number, hlGroup: string, line: number, colStart: number, colEnd: number, propTypeOpts: dict<any> = {}): any
   var sourceId: number
   if srcId == 0
     sourceId = s:max_src_id + 1
@@ -550,30 +539,24 @@ def coc#api#funcs_buf_add_highlight(bufnr: number, srcId: number, hlGroup: strin
     sourceId = srcId
   endif
   const bufferNumber: number = bufnr == 0 ? bufnr('%') : bufnr
-  const propType: string = srcId == -1 ? hlGroup : $'{hlGroup}_{sourceId}'
-  final propTypes: list<string> = get(s:id_types, srcId, [])
-  if index(propTypes, propType) == -1
-    add(propTypes, propType)
-    s:id_types[srcId] = propTypes
-    if empty(prop_type_get(propType))
-      prop_type_add(propType, extend({'highlight': hlGroup}, propTypeOpts))
-    endif
-  endif
-  const columnEnd: number = colEnd == -1 ? strlen(get(getbufline(bufferNumber, line + 1), 0, '')) + 1 : colEnd + 1
+  call coc#api#funcs_buf_add_highlight(bufferNumber, sourceId, hlGroup, line, colStart, colEnd, propTypeOpts)
+  return sourceId
+enddef
+
+" To be called directly for better performance
+" 0 based line, colStart, colEnd, see `:h prop_type_add` for propTypeOpts
+def coc#api#funcs_buf_add_highlight(bufnr: number, srcId: number, hlGroup: string, line: number, colStart: number, colEnd: number, propTypeOpts: dict<any> = {}): void
+  const columnEnd: number = colEnd == -1 ? strlen(get(getbufline(bufnr, line + 1), 0, '')) + 1 : colEnd + 1
   if columnEnd < colStart + 1
-    return 0 # Same as `:return` without expression in `:function`
+    return
   endif
+  const propType: string = coc#api#create_type(srcId, hlGroup, propTypeOpts)
   const propId: number = s:generate_id(bufnr)
   try
-    prop_add(line + 1, colStart + 1, {'bufnr': bufferNumber, 'type': propType, 'id': propId, 'end_col': columnEnd})
+    prop_add(line + 1, colStart + 1, {'bufnr': bufnr, 'type': propType, 'id': propId, 'end_col': columnEnd})
   catch /^Vim\%((\a\+)\)\=:\(E967\|E964\)/
     # ignore 967
   endtry
-  if srcId == 0
-    # return generated sourceId
-    return sourceId
-  endif
-  return v:null
 enddef
 
 function! s:funcs.buf_clear_namespace(bufnr, srcId, startLine, endLine) abort
@@ -601,8 +584,40 @@ function! s:funcs.buf_line_count(bufnr) abort
 endfunction
 
 function! s:funcs.buf_attach(...)
-  " not supported
-  return 1
+  let bufnr = get(a:, 1, 0)
+  " listener not removed on e!
+  let id = get(s:listener_map, bufnr, 0)
+  if id
+    call listener_remove(id)
+  endif
+  let result = listener_add('s:on_buf_change', bufnr)
+  if result
+    let s:listener_map[bufnr] = result
+    return v:true
+  endif
+  return v:false
+endfunction
+
+function! s:on_buf_change(bufnr, start, end, added, changes) abort
+  let result = []
+  for item in a:changes
+    let start = item['lnum'] - 1
+    " Delete lines
+    if item['added'] < 0
+      " include start line, which needed for undo
+      let lines = getbufline(a:bufnr, item['lnum'])
+      call add(result, [start, 0 - item['added'] + 1, lines])
+    " Add lines
+    elseif item['added'] > 0
+      let lines = getbufline(a:bufnr, item['lnum'], item['lnum'] + item['added'])
+      call add(result, [start, 1, lines])
+    " Change lines
+    else
+      let lines = getbufline(a:bufnr, item['lnum'], item['end'] - 1)
+      call add(result, [start, item['end'] - item['lnum'], lines])
+    endif
+  endfor
+  call coc#rpc#notify('vim_buf_change_event', [a:bufnr, getbufvar(a:bufnr, 'changedtick'), result])
 endfunction
 
 function! s:funcs.buf_detach()
@@ -901,25 +916,36 @@ function! s:funcs.tabpage_get_win(tid)
 endfunction
 " }}
 
-function! coc#api#get_types(srcId) abort
-  return get(s:id_types, a:srcId, [])
-endfunction
+def coc#api#get_types(srcId: number): list<string>
+  return get(s:id_types, srcId, [])
+enddef
 
-function! coc#api#get_id_types() abort
-  return s:id_types
-endfunction
-
-function! coc#api#create_type(srcId, hlGroup, opts) abort
-  let type = a:hlGroup.'_'.a:srcId
-  let types = get(s:id_types, a:srcId, [])
+def coc#api#create_type(src_id: number, hl_group: string, opts: dict<any>): string
+  const type: string = hl_group .. '_' .. string(src_id)
+  final types: list<string> = get(s:id_types, src_id, [])
   if index(types, type) == -1
-    call add(types, type)
-    let s:id_types[a:srcId] = types
-    let combine = get(a:opts, 'hl_mode', 'combine') ==# 'combine'
-    call prop_type_add(type, {'highlight': a:hlGroup, 'combine': combine})
+    add(types, type)
+    s:id_types[src_id] = types
+    if empty(prop_type_get(type))
+      final type_option: dict<any> = {'highlight': hl_group}
+      const hl_mode: string = get(opts, 'hl_mode', 'combine')
+      if hl_mode !=# 'combine'
+        type_option['override'] = 1
+        type_option['combine'] = 0
+      endif
+      # vim not throw for unknown properties
+      prop_type_add(type, extend(type_option, opts))
+    endif
   endif
   return type
-endfunction
+enddef
+
+def s:generate_id(bufnr: number): number
+  const max: number = get(s:buffer_id, bufnr, s:prop_offset)
+  const id: number = max + 1
+  s:buffer_id[bufnr] = id
+  return id
+enddef
 
 function! coc#api#func_names() abort
   return keys(s:funcs)
@@ -929,7 +955,11 @@ function! coc#api#call(method, args) abort
   let err = v:null
   let res = v:null
   try
+    let tick = b:changedtick
     let res = call(s:funcs[a:method], a:args)
+    if b:changedtick != tick
+      call listener_flush(bufnr('%'))
+    endif
   catch /.*/
     let err = v:exception .' on api "'.a:method.'" '.json_encode(a:args)
   endtry
@@ -942,6 +972,7 @@ endfunction
 
 function! coc#api#notify(method, args) abort
   try
+    let tick = b:changedtick
     " vim throw error with return when vim9 function has no return value.
     if a:method ==# 'call_function'
       call call(a:args[0], a:args[1])
@@ -953,6 +984,9 @@ function! coc#api#notify(method, args) abort
       endif
     else
       call call(s:funcs[a:method], a:args)
+    endif
+    if b:changedtick != tick
+      call listener_flush(bufnr('%'))
     endif
   catch /.*/
     call coc#rpc#notify('nvim_error_event', [0, v:exception.' on api "'.a:method.'" '.json_encode(a:args)])
@@ -972,4 +1006,6 @@ endfunction
 function! coc#api#get_tabid(nr) abort
   return s:tabnr_id(a:nr)
 endfunction
+
+defcompile
 " vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{,}} foldmethod=marker foldlevel=0:

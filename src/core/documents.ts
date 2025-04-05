@@ -2,22 +2,25 @@
 import { Neovim } from '@chemzqm/neovim'
 import { FormattingOptions, Location, LocationLink, TextEdit } from 'vscode-languageserver-types'
 import { URI } from 'vscode-uri'
+import commands from '../commands'
 import Configurations from '../configuration'
 import { IConfigurationChangeEvent } from '../configuration/types'
-import events, { InsertChange } from '../events'
+import events from '../events'
 import { createLogger } from '../logger'
 import Document from '../model/document'
 import { LinesTextDocument } from '../model/textdocument'
 import { BufferOption, DidChangeTextDocumentParams, Env, LocationWithTarget, QuickfixItem } from '../types'
 import { defaultValue, disposeAll } from '../util'
+import { isVim } from '../util/constants'
+import { convertFormatOptions, VimFormatOption } from '../util/convert'
 import { normalizeFilePath, readFile, readFileLine, resolveRoot } from '../util/fs'
+import { emptyObject } from '../util/is'
 import { fs, os, path } from '../util/node'
 import * as platform from '../util/platform'
 import { Disposable, Emitter, Event, TextDocumentSaveReason } from '../util/protocol'
 import { byteIndex } from '../util/string'
 import type { TextDocumentWillSaveEvent } from './files'
 import WorkspaceFolder from './workspaceFolder'
-import { convertFormatOptions, VimFormatOption } from '../util/convert'
 const logger = createLogger('core-documents')
 
 interface StateInfo {
@@ -77,6 +80,12 @@ export default class Documents implements Disposable {
     let { bufnrs, bufnr } = await this.nvim.call('coc#util#all_state') as StateInfo
     this._bufnr = bufnr
     await Promise.all(bufnrs.map(bufnr => this.createDocument(bufnr)))
+    if (isVim) {
+      events.on('CursorHold', async bufnr => {
+        let doc = this.getDocument(bufnr)
+        if (doc && doc.attached) await doc.checkLines()
+      }, null, this.disposables)
+    }
     events.on('BufDetach', this.onBufDetach, this, this.disposables)
     events.on('BufRename', async bufnr => {
       this.detachBuffer(bufnr)
@@ -101,14 +110,6 @@ export default class Documents implements Disposable {
     events.on('BufEnter', (bufnr: number) => {
       void this.createDocument(bufnr)
     }, null, this.disposables)
-    if (this._env.isVim) {
-      ['TextChangedP', 'TextChangedI', 'TextChanged'].forEach(event => {
-        events.on(event as any, (bufnr: number, info?: InsertChange) => {
-          let doc = this.buffers.get(bufnr)
-          if (doc && doc.attached) doc.onTextChange(event, info)
-        }, null, this.disposables)
-      })
-    }
   }
 
   private getConfiguration(e?: IConfigurationChangeEvent): void {
@@ -426,6 +427,8 @@ export default class Documents implements Disposable {
     if (doc) {
       let workspaceFolder = this.workspaceFolder.getWorkspaceFolder(URI.parse(doc.uri))
       if (workspaceFolder) this._root = URI.parse(workspaceFolder.uri).fsPath
+      // The buffer could be hidden before, lines may not synchronized, invoke listener_flush
+      if (isVim) void doc.patchChange()
     }
   }
 
@@ -449,6 +452,8 @@ export default class Documents implements Disposable {
     this._onDidCloseDocument.fire(doc.textDocument)
     this.buffers.delete(bufnr)
     doc.detach()
+    const uris = this.textDocuments.map(o => URI.parse(o.uri))
+    this.workspaceFolder.onDocumentDetach(uris)
   }
 
   private async onBufWritePost(bufnr: number, changedtick: number): Promise<void> {
@@ -475,6 +480,7 @@ export default class Documents implements Disposable {
     let firing = true
     let thenables: Thenable<TextEdit[] | any>[] = []
     let event: TextDocumentWillSaveEvent = {
+      bufnr: doc.bufnr,
       document: doc.textDocument,
       reason: TextDocumentSaveReason.Manual,
       waitUntil: (thenable: Thenable<any>) => {
@@ -520,6 +526,22 @@ export default class Documents implements Disposable {
       let edits = await promise
       if (edits) await doc.applyEdits(edits, false, this.bufnr === doc.bufnr)
     }
+    await this.tryCodeActionsOnSave(doc)
+  }
+
+  public async tryCodeActionsOnSave(doc: Document): Promise<boolean> {
+    let editorConfig = this.configurations.getConfiguration('editor', doc.textDocument)
+    let conf = editorConfig.get('codeActionsOnSave', {})
+    if (emptyObject(conf)) return false
+    const actions: string[] = []
+    for (const key of Object.keys(conf)) {
+      if (conf[key] === true || conf[key] === 'always') {
+        actions.push(key)
+      }
+    }
+    if (actions.length === 0) return false
+    await commands.executeCommand('editor.action.executeCodeActions', doc, undefined, actions, this.config.willSaveHandlerTimeout)
+    return true
   }
 
   private onFileTypeChange(filetype: string, bufnr: number): void {
@@ -587,9 +609,9 @@ export default class Documents implements Disposable {
     }
   }
 
-  public fixUnixPrefix(filepath: string, prefix: string): string {
+  public fixUnixPrefix(filepath: string): string {
     if (!this._env.isCygwin || !/^\w:/.test(filepath)) return filepath
-    return prefix + filepath[0].toLowerCase() + filepath.slice(2).replace(/\\/g, '/')
+    return this._env.unixPrefix + filepath[0].toLowerCase() + filepath.slice(2).replace(/\\/g, '/')
   }
 
   /**
@@ -610,7 +632,7 @@ export default class Documents implements Disposable {
     let endLine = start.line == end.line ? text : await this.getLine(uri, end.line)
     let item: QuickfixItem = {
       uri,
-      filename: u.scheme == 'file' ? this.fixUnixPrefix(u.fsPath, this._env.unixPrefix) : uri,
+      filename: u.scheme == 'file' ? this.fixUnixPrefix(u.fsPath) : uri,
       lnum: start.line + 1,
       end_lnum: end.line + 1,
       col: text ? byteIndex(text, start.character) + 1 : start.character + 1,

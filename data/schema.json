@@ -27,7 +27,7 @@
         },
         "borderhighlight": {
           "type": "string",
-          "default": "CocFloating",
+          "default": "CocFloatBorder",
           "description": "Border highlight group of float window."
         },
         "close": {
@@ -868,7 +868,7 @@
       "type": "string",
       "scope": "language-overridable",
       "enum": ["top", "eol", "right_align"],
-      "description": "Position of codeLens, requires nvim >= 0.6.0",
+      "description": "Display position of codeLens virtual text.",
       "default": "top"
     },
     "codeLens.separator": {
@@ -1267,6 +1267,16 @@
       "maximum": 5000,
       "scope": "resource",
       "description": "Timeout for document highlight, in milliseconds."
+    },
+    "editor.codeActionsOnSave": {
+      "additionalProperties": {
+        "type": ["string", "boolean"],
+        "enum": ["always", "never", true, false]
+      },
+      "type": "object",
+      "default": {},
+      "scope": "language-overridable",
+      "description": "Run Code Actions for the buffer on save, normally source actions, Example: `\"source.organizeImports\": \"always\""
     },
     "fileSystemWatch.watchmanPath": {
       "type": ["null", "string"],
@@ -2473,6 +2483,12 @@
       "default": true,
       "scope": "application",
       "description": "Use current working directory as workspace folder when no root patterns resolved."
+    },
+    "workspace.removeEmptyWorkspaceFolder": {
+      "type": "boolean",
+      "default": false,
+      "scope": "application",
+      "description": "Automatically remove the workspace folder when no buffer associated with it."
     },
     "languageserver": {
       "type": "object",

@@ -9,6 +9,7 @@ import { DiagnosticWithFileType, DidChangeTextDocumentParams, Documentation, Flo
 import { getConditionValue } from '../util'
 import { stripAnsiColoring } from '../util/ansiparse'
 import { isFalsyOrEmpty } from '../util/array'
+import { onUnexpectedError } from '../util/errors'
 import { path } from '../util/node'
 import { lineInRange, positionInRange } from '../util/position'
 import { Emitter, Event } from '../util/protocol'
@@ -16,7 +17,6 @@ import window from '../window'
 import workspace from '../workspace'
 import { DiagnosticItem } from './manager'
 import { adjustDiagnostics, DiagnosticConfig, formatDiagnostic, getHighlightGroup, getLocationListItem, getNameFromSeverity, getSeverityName, getSeverityType, LocationListItem, severityLevel, sortDiagnostics } from './util'
-import { onUnexpectedError } from '../util/errors'
 const signGroup = 'CocDiagnostic'
 const NAMESPACE = 'diagnostic'
 // higher priority first
@@ -59,7 +59,7 @@ export class DiagnosticBuffer implements SyncItem {
   private _dirties: Set<string> = new Set()
   private _refreshing = false
   private _config: DiagnosticConfig
-  public refreshHighlights: Function & { clear(): void }
+  public refreshHighlights: (() => void) & { clear(): void }
   private readonly _onDidRefresh = new Emitter<ReadonlyArray<Diagnostic>>()
   public readonly onDidRefresh: Event<ReadonlyArray<Diagnostic>> = this._onDidRefresh.event
   constructor(

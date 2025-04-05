@@ -7,6 +7,7 @@ Core features
 	File system watch 			|coc-config-fileSystemWatch|
 	Extensions 				|coc-config-extensions|
 	Preferences 				|coc-config-preferences|
+	Editor 					|coc-config-editor|
 	Float factory 				|coc-config-floatFactory|
 	Float 					|coc-config-float|
 	Tree 					|coc-config-tree|
@@ -103,6 +104,13 @@ WORKSPACE
 	patterns resolved.
 
 	Scope: `application`, default: `true`
+
+"workspace.removeEmptyWorkspaceFolder"			*coc-config-workspace-removeEmptyWorkspaceFolder*
+
+	Automatically remove the workspace folder when no buffer associated
+	with it.
+
+	Scope: `application`, default: `false`
 
 ------------------------------------------------------------------------------
 FILESYSTEMWATCH 					*coc-config-fileSystemWatch*
@@ -236,9 +244,10 @@ PREFERENCES
 
 	Scope: `language-overridable`, default: `false`
 
-"coc.preferences.formatterExtension"			*coc-preferences-formatterExtension*
+"coc.preferences.formatterExtension" 			*coc-preferences-formatterExtension*
 
-	Extension used for formatting documents. When set to null, the formatter with highest priority is used.
+	Extension used for formatting documents. When set to null, the
+	formatter with highest priority is used.
 
 	Scope: `language-overridable`, default: `null`
 
@@ -308,6 +317,19 @@ PREFERENCES
 	Scope: `application`, default: `0`
 
 ------------------------------------------------------------------------------
+EDITOR
+							*coc-config-editor*
+							*coc-config-editor-codeActionsOnSave*
+
+"editor.codeActionsOnSave"
+
+	Run Code Actions for the buffer on save, normally source actions,
+	Example: `\"source.organizeImports\": \"always\"`,
+	|coc-preferences-willSaveHandlerTimeout| is used for timeout control.
+
+	Scope: `language-overridable`, default: `{}`
+
+------------------------------------------------------------------------------
 FLOATfACTORY
 							*coc-config-floatFactory*
 "floatFactory.floatConfig"				*coc-config-floatFactory-floatConfig*
@@ -333,7 +355,7 @@ following properties are supported:
 	  `"CocFloating"`.
 	- "title": Title text used by float window, default: `""`.
 	- "borderhighlight": Border highlight group of float window, default:
-	  `"CocFloating"`.
+	  `"CocFloatBorder"`.
 	- "close": Set to `true` to draw close icon.
 	- "maxWidth": Maximum width of float window, contains border.
 	- "maxHeight": Maximum height of float window, contains border.
@@ -700,7 +722,7 @@ CODELENS
 
 "codeLens.position"					*coc-config-codeLens-position*
 
-	Position of codeLens, requires nvim >= 0.6.0.
+	Display position of codeLens virtual text.
 
 	Scope: `resource`, default: `"top"`
 

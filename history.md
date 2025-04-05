@@ -2,6 +2,54 @@
 
 Notable changes of coc.nvim:
 
+## 2025-04-04
+
+- Add `right_gravity` property to `VirtualTextOption`.
+
+## 2025-04-03
+
+- Add `disposables` argument to `workspace.registerAutocmd()`
+- Change behavior for failure autocmd request, echo message instead of throw
+  error.
+
+## 2025-04-02
+
+- Add method `window.getVisibleRanges()` to typings.
+- Break change: set `w:cocViewId` to upper case letters, see `:h w:cocViewId`
+
+## 2025-04-01
+
+- Add configuration `workspace.removeEmptyWorkspaceFolder` default to `false`.
+- Add configuration `editor.codeActionsOnSave` , similar to VSCode.
+
+## 2025-03-31
+
+- Change `placeHolder`to `placeholder` for `QuickPickOptions` like VSCode (old
+  option still works).
+- Change interface `DocumentSelector`, could also be `DocumentFilter` or
+  `string`, not only array of them.
+- Add `context.extensionUri` like VSCode.
+- Add `document` property to `DidChangeTextDocumentParams`, like VSCode.
+- Add `before()` and `after()` methods to `LinkedMap`, same as VSCode.
+- Add `onFocus` and `match()` to `DiagnosticPullOptions`.
+- Add `onFocus` to `DiagnosticPullMode` and export `DiagnosticPullMode`
+- Add interface `InlineValuesProvider`, `DiagnosticProvider` to typings.
+- Add missing properties to `LanguageClient` class, including
+  `createDefaultErrorHandler()`, `state` `middleware` `isInDebugMode`
+  `isRunning()` `dispose()` `getFeature()`
+
+## 2025-03-29
+
+- Add `bufnr` to `WinScrolled` event.
+
+## 2025-03-28
+
+- Improve vim9 highlight by vim9 script #5285.
+
+## 2025-03-27
+
+- Reworked snippets for UltiSnips options and actions support, see `:h coc-snippets` and #5282.
+
 ## 2025-03-13
 
 - Add `coc.preferences.autoApplySingleQuickfix` configuration
