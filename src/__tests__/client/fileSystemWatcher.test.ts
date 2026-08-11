@@ -4,10 +4,13 @@ import { URI } from 'vscode-uri'
 import { asRelativePattern } from '../../language-client/fileSystemWatcher'
 import { LanguageClient, LanguageClientOptions, Middleware, ServerOptions, TransportKind } from '../../language-client/index'
 import { IFileSystemWatcher } from '../../types'
-import helper from '../helper'
+import { before, describe, it } from 'node:test'
+import assert from 'node:assert/strict'
+
+let session: EditorSession
 
 function createClient(fileEvents: IFileSystemWatcher | IFileSystemWatcher[] | undefined, middleware: Middleware = {}): LanguageClient {
-  const serverModule = path.join(__dirname, './server/fileWatchServer.js')
+  const serverModule = path.join(import.meta.dirname, './server/fileWatchServer.js')
   const serverOptions: ServerOptions = {
     run: { module: serverModule, transport: TransportKind.ipc },
     debug: { module: serverModule, transport: TransportKind.ipc, options: { execArgv: ['--nolazy', '--inspect=6014'] } }
@@ -55,18 +58,14 @@ class CustomWatcher implements IFileSystemWatcher {
   }
 }
 
-beforeAll(async () => {
-  await helper.setup()
+before(async () => {
+  session = getSession()
 })
 
-afterAll(async () => {
-  await helper.shutdown()
-})
-
-describe('FileSystemWatcherFeature', () => {
-  it('should hook file events from client configuration', async () => {
+editorSuite('FileSystemWatcherFeature', () => {
+  it('should hook file events from client configuration', async t => {
     let res = asRelativePattern({ baseUri: { name: 'name', uri: '/tmp' }, pattern: '**' })
-    expect(res.baseUri.fsPath).toBe('/tmp')
+    assert.strictEqual(res.baseUri.fsPath, '/tmp')
     let client: LanguageClient
     let watcher = new CustomWatcher()
     let called = false
@@ -87,26 +86,26 @@ describe('FileSystemWatcherFeature', () => {
       received = params.changes
     })
     await client.start()
-    expect(called).toBe(false)
+    assert.strictEqual(called, false)
     client.notifyFileEvent(undefined)
-    await helper.wait(20)
-    let uri = URI.file(__filename)
+    await session.wait(20)
+    let uri = URI.file(import.meta.filename)
     watcher.fireCreate(uri)
-    expect(called).toBe(true)
+    assert.strictEqual(called, true)
     watcher.fireChange(uri)
     watcher.fireDelete(uri)
-    expect(changes).toEqual([1, 2, 3])
-    await helper.waitValue(() => {
+    assert.deepStrictEqual(changes, [1, 2, 3])
+    await session.waitValue(() => {
       return received?.length
     }, 3)
     await client.stop()
-    expect(received[2]).toEqual({
+    assert.deepStrictEqual(received[2], {
       uri: uri.toString(),
       type: 3
     })
   })
 
-  it('should work with single watcher', async () => {
+  it('should work with single watcher', async t => {
     let client: LanguageClient
     let watcher = new CustomWatcher()
     client = createClient(watcher, {})
@@ -115,38 +114,37 @@ describe('FileSystemWatcherFeature', () => {
       received = params.changes
     })
     await client.start()
-    let uri = URI.file(__filename)
+    let uri = URI.file(import.meta.filename)
     watcher.fireCreate(uri)
-    await helper.waitValue(() => {
+    await session.waitValue(() => {
       return received?.length
     }, 1)
     let called = false
-    let spy = vi.spyOn(client, 'sendNotification').mockImplementation(() => {
+    let spy = t.mock.method(client, 'sendNotification', () => {
       called = true
       return Promise.reject(new Error('myerror'))
     })
     watcher.fireChange(uri)
-    await helper.waitValue(() => called, true)
-    spy.mockRestore()
+    await session.waitValue(() => called, true)
     await client.stop()
   })
 
-  it('should support dynamic registration', async () => {
+  it('should support dynamic registration', async t => {
     let client: LanguageClient
     client = createClient(undefined)
     await client.start()
-    await helper.waitValue(async () => {
+    await session.waitValue(async () => {
       let feature = client.getFeature(DidChangeWatchedFilesNotification.method)
       if (feature) await (feature as any)._notifyFileEvent()
       return feature != undefined
     }, true)
-    await helper.waitValue(async () => {
+    await session.waitValue(async () => {
       let feature = client.getFeature(DidChangeWatchedFilesNotification.method)
       let state = feature.getState()
       return (state as any).registrations
     }, true)
     await client.sendNotification('unwatch')
-    await helper.waitValue(() => {
+    await session.waitValue(() => {
       let feature = client.getFeature(DidChangeWatchedFilesNotification.method)
       let state = feature.getState()
       return (state as any)?.registrations

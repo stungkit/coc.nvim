@@ -55,7 +55,10 @@ export default defineConfig({
         pool: 'threads',
         isolate: false,
         // globalSetup
-        include: runCommand('rg --files-without-match -F \'await helper.setup\' -g \'*.test.ts\' src/__tests__'),
+        // Files migrated to the native runner carry a `@coc-test` header;
+        // keep Vitest from trying to run them (node:test suites are invisible
+        // to Vitest and would report as "no tests").
+        include: runCommand('rg --files-without-match -e \'await helper\\.setup|@coc-test\' -g \'*.test.ts\' src/__tests__'),
         exclude: ['src/__tests__/unit/configurationModel.test.ts'],
       },
     }, {

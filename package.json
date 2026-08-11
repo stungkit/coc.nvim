@@ -7,7 +7,7 @@
     "coc-mcp": "bin/coc-mcp.js"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=24.12.0"
   },
   "type": "commonjs",
   "scripts": {
@@ -16,6 +16,8 @@
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "test": "vitest run",
+    "test:native": "node scripts/test/cli.mjs",
+    "test:native:unit": "node scripts/test/cli.mjs --unit",
     "test-build": "vitest run --coverage",
     "prepare": "node esbuild.js"
   },
