@@ -17,6 +17,22 @@ afterEach(editorReset)
 
 describe('FloatFactory', () => {
   describe('show()', () => {
+    it('should reuse buffer after closing', async () => {
+      await floatFactory.show([{ filetype: 'txt', content: 'first hover' }])
+      let bufnr = floatFactory.bufnr
+      assert.ok(bufnr > 0)
+      for (let i = 0; i < 3; i++) {
+        floatFactory.close()
+        assert.strictEqual(floatFactory.bufnr, 0)
+        assert.strictEqual(floatFactory.buffer, null)
+        assert.strictEqual(floatFactory.window, null)
+        await floatFactory.show([{ filetype: 'txt', content: `hover ${i}` }])
+        assert.strictEqual(floatFactory.bufnr, bufnr)
+        assert.deepStrictEqual(await floatFactory.buffer.lines, [`hover ${i}`])
+      }
+      floatFactory.close()
+    })
+
     it('should close after create window', async t => {
       let docs: Documentation[] = [{
         filetype: 'markdown',

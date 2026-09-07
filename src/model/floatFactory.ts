@@ -47,6 +47,7 @@ export interface FloatWinConfig extends FloatConfig {
 export default class FloatFactoryImpl implements Disposable {
   private winid = 0
   private _bufnr = 0
+  private reusableBufnr = 0
   private closeToken = 0
   private targetBufnr: number
   private mutex: Mutex = new Mutex()
@@ -178,7 +179,8 @@ export default class FloatFactoryImpl implements Disposable {
     let autoHide = opts.autoHide === false ? false : true
     if (autoHide) config.autohide = 1
     this.unbind()
-    let arr = await this.nvim.call('coc#dialog#create_cursor_float', [this.winid, this._bufnr, lines, config]) as [number, [number, number], number, number, number]
+    let arr = await this.nvim.call('coc#dialog#create_cursor_float', [this.winid, this.reusableBufnr, lines, config]) as [number, [number, number], number, number, number]
+    if (!isFalsyOrEmpty(arr)) this.reusableBufnr = arr[3]
     if (isFalsyOrEmpty(arr) || this.closeToken > token) {
       let winid = arr && arr.length > 0 ? arr[2] : this.winid
       if (winid) {
