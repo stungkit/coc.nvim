@@ -229,10 +229,12 @@ class DiagnosticManager implements Disposable {
   }
 
   /**
-   * Get readonly diagnostics for a buffer
+   * Get readonly diagnostics for a buffer or URI
    */
-  public getDiagnostics(buf: DiagnosticBuffer): { [collection: string]: Diagnostic[] } {
+  public getDiagnostics(buffer: DiagnosticBuffer | string): { [collection: string]: Diagnostic[] } {
     let res: { [collection: string]: Diagnostic[] } = {}
+    let buf = typeof buffer === 'string' ? this.buffers?.getItem(buffer) : buffer
+    if (!buf) return res
     for (let collection of this.collections) {
       if (!collection.has(buf.uri)) continue
       res[collection.name] = this.getDiagnosticsByCollection(buf, collection)
