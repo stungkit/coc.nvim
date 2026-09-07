@@ -164,6 +164,22 @@ describe('vim api', () => {
     assert.strictEqual(bufname, '[Coc Info]')
     await nvim.command('bd!')
   })
+  it('should escape info buffer name', async t => {
+    const cwd = await nvim.call('getcwd') as string
+    const folder = path.join(os.tmpdir(), crypto.randomUUID())
+    fs.mkdirSync(path.join(folder, 'o'), { recursive: true })
+    await nvim.setDirectory(folder)
+    try {
+      const handler = getCurrentPlugin().getHandler().workspace
+      await handler.showInfo()
+      const bufname = await nvim.call('bufname', ['%']) as string
+      assert.strictEqual(bufname, '[Coc Info]')
+    } finally {
+      await nvim.command('bd!')
+      await nvim.setDirectory(cwd)
+      fs.rmSync(folder, { recursive: true, force: true })
+    }
+  })
 
   it('should navigate complete items', async t => {
     shared.updateConfiguration('suggest.noselect', true)
