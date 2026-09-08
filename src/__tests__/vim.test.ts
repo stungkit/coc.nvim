@@ -19,6 +19,33 @@ import snippetManager from '../snippets/manager'
 import type { SnippetEdit } from '../snippets/session'
 import { sameFile } from '../util/fs'
 import workspace from '../workspace'
+import window from '../window'
+
+describe('cursors case conversion (#5755)', () => {
+  afterEach(editorReset)
+  afterEach(() => window.cursors.reset())
+
+  for (const [keys, words, expected] of [
+    ['viwU', ['alpha', 'beta', 'Gamma'], ['ALPHA', 'BETA', 'GAMMA']],
+    ['viwu', ['ALpha', 'BETA', 'gAMMa'], ['alpha', 'beta', 'gamma']],
+  ] as [string, string[], string[]][]) {
+    it(`should apply ${keys} to each word`, async () => {
+      const editor = workspace.nvim
+      const doc = await workspace.document
+      await editor.call('setline', [1, words])
+      await doc.synchronize()
+      for (let line = 1; line <= words.length; line++) {
+        await editor.call('cursor', [line, 1])
+        await editor.input('<Plug>(coc-cursors-word)')
+        await shared.waitValue(() => window.cursors.getSession(doc.bufnr)?.currentRanges.length, line)
+      }
+      await editor.input(keys)
+      await shared.waitValue(() => doc.buffer.lines, expected)
+      assert.deepStrictEqual(window.cursors.getSession(doc.bufnr)?.currentRanges,
+        expected.map((word, i) => Range.create(i, 0, i, word.length)))
+    })
+  }
+})
 
 function disposeAll(disposables: Disposable[]): void {
   while (disposables.length) {

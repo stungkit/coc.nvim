@@ -774,3 +774,128 @@ describe('cursors', () => {
     })
   })
 })
+
+describe('cursors case conversion (#5755)', () => {
+  afterEach(editorReset)
+  afterEach(() => window.cursors.reset())
+
+  async function selectWords(words: string[]) {
+    const nvim = workspace.nvim
+    const doc = await workspace.document
+    await nvim.call('setline', [1, words.map((word, i) => `${word} = ${i + 1}`)])
+    await doc.synchronize()
+    for (let line = 1; line <= words.length; line++) {
+      await nvim.call('cursor', [line, 1])
+      await nvim.input('<Plug>(coc-cursors-word)')
+      await shared.waitValue(() => window.cursors.getSession(doc.bufnr)?.currentRanges.length, line)
+    }
+    return doc
+  }
+
+  it('should uppercase each selected word independently', async t => {
+    const nvim = workspace.nvim
+    const doc = await selectWords(['alpha', 'beta', 'gamma'])
+    assert.deepStrictEqual(window.cursors.getSession(doc.bufnr).currentRanges, [
+      Range.create(0, 0, 0, 5),
+      Range.create(1, 0, 1, 4),
+      Range.create(2, 0, 2, 5),
+    ])
+    const session = window.cursors.getSession(doc.bufnr)
+    let updated = false
+    t.after(session.onDidUpdate(() => { updated = true }).dispose)
+    await nvim.input('viwU')
+    await shared.waitValue(() => updated, true)
+    assert.deepStrictEqual(await doc.buffer.lines, ['ALPHA = 1', 'BETA = 2', 'GAMMA = 3'])
+  })
+
+  for (const [keys, words, expected] of [
+    ['viwu', ['ALPHA', 'BETA', 'GAMMA'], ['alpha', 'beta', 'gamma']],
+    ['gUiw', ['alpha', 'bETA', 'Gamma'], ['ALPHA', 'BETA', 'GAMMA']],
+    ['guiw', ['ALpha', 'BETA', 'gAMMa'], ['alpha', 'beta', 'gamma']],
+    ['viwu', ['İ', 'BETA', 'GAMMA'], ['i', 'beta', 'gamma']],
+    ['ciwOTHER<Esc>', ['alpha', 'beta', 'gamma'], ['OTHER', 'OTHER', 'OTHER']],
+    ['rG', ['alpha', 'beta', 'gamma'], ['Glpha', 'Geta', 'Gamma']],
+  ] as [string, string[], string[]][]) {
+    it(`should synchronize ${keys} on ${words.join(', ')}`, async () => {
+      const doc = await selectWords(words)
+      await workspace.nvim.input(keys)
+      await shared.waitValue(() => doc.buffer.lines, expected.map((word, i) => `${word} = ${i + 1}`))
+      assert.deepStrictEqual(window.cursors.getSession(doc.bufnr)?.currentRanges,
+        expected.map((word, i) => Range.create(i, 0, i, word.length)))
+    })
+  }
+
+  it('should match native Unicode uppercase conversion', async () => {
+    const nvim = workspace.nvim
+    const words = ['école', 'beta', 'straße']
+    const expected: string[] = []
+    // Use actual native operations as the oracle; Unicode tables differ
+    // between editor versions (notably the uppercase form of sharp s).
+    for (const word of words) {
+      await nvim.setLine(word)
+      await nvim.command('normal! 0viwU')
+      expected.push(await nvim.getLine())
+    }
+    const doc = await selectWords(words)
+    await nvim.input('viwU')
+    await shared.waitValue(() => doc.buffer.lines, expected.map((word, i) => `${word} = ${i + 1}`))
+  })
+
+  it('should copy an unrelated uppercase replacement literally', async () => {
+    const doc = await selectWords(['alpha', 'beta', 'gamma'])
+    await doc.applyEdits([TextEdit.replace(Range.create(2, 0, 2, 5), 'OTHER')])
+    await shared.waitValue(() => doc.buffer.lines, ['OTHER = 1', 'OTHER = 2', 'OTHER = 3'])
+  })
+
+  it('should not apply a stale conversion after another edit', async t => {
+    const doc = await selectWords(['alpha', 'beta', 'gamma'])
+    const nvim = workspace.nvim
+    const call = nvim.call.bind(nvim)
+    let release: () => void
+    let entered = false
+    const gate = new Promise<void>(resolve => { release = resolve })
+    t.after(() => release())
+    t.mock.method(nvim, 'call', (method: string, args: unknown[], notify?: boolean) => {
+      if (method === 'map') {
+        entered = true
+        return gate.then(() => call(method, args))
+      }
+      return notify ? call(method, args, true) : call(method, args)
+    })
+    await nvim.input('viwU')
+    await shared.waitValue(() => entered, true)
+    await doc.applyEdits([TextEdit.insert({ line: 0, character: 9 }, '!')])
+    release()
+    await shared.waitValue(() => window.cursors.getSession(doc.bufnr), undefined)
+    assert.deepStrictEqual(await doc.buffer.lines, ['alpha = 1!', 'beta = 2', 'GAMMA = 3'])
+  })
+
+  it('should preserve same-line ranges and subsequent edits', async () => {
+    const nvim = workspace.nvim
+    const doc = await workspace.document
+    await nvim.setLine('alpha beta Gamma')
+    await doc.synchronize()
+    await window.cursors.addRanges([
+      Range.create(0, 0, 0, 5), Range.create(0, 6, 0, 10), Range.create(0, 11, 0, 16)
+    ])
+    await nvim.call('cursor', [1, 12])
+    await nvim.input('viwU')
+    await shared.waitValue(() => doc.buffer.lines, ['ALPHA BETA GAMMA'])
+    await nvim.input('A!<Esc>')
+    await shared.waitValue(() => doc.buffer.lines, ['ALPHA! BETA! GAMMA!'])
+    assert.deepStrictEqual(window.cursors.getSession(doc.bufnr)?.currentRanges, [
+      Range.create(0, 0, 0, 6), Range.create(0, 7, 0, 12), Range.create(0, 13, 0, 19)
+    ])
+  })
+
+  it('should undo and redo the batch as one change', async () => {
+    const doc = await selectWords(['alpha', 'beta', 'gamma'])
+    const nvim = workspace.nvim
+    await nvim.input('viwU')
+    await shared.waitValue(() => doc.buffer.lines, ['ALPHA = 1', 'BETA = 2', 'GAMMA = 3'])
+    await nvim.input('u')
+    await shared.waitValue(() => doc.buffer.lines, ['alpha = 1', 'beta = 2', 'gamma = 3'])
+    await nvim.input('<C-r>')
+    await shared.waitValue(() => doc.buffer.lines, ['ALPHA = 1', 'BETA = 2', 'GAMMA = 3'])
+  })
+})

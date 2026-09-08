@@ -248,21 +248,61 @@ export default class CursorSession {
 
   private async applySingleEdit(textRange: TextRange, edit: TextEdit): Promise<void> {
     // single range change, calculate & apply changes for all ranges
-    let { doc, ranges } = this
+    let { doc } = this
+    let ranges = this.ranges.slice()
+    let version = doc.version
+    // Document changes can omit an unchanged prefix or suffix. Compare the
+    // complete selected text, not just the changed part of the word.
+    let text = textRange.text
+    let start = edit.range.start.character - textRange.position.character
+    let end = edit.range.end.character - textRange.position.character
+    let newText = text.slice(0, start) + edit.newText + text.slice(end)
+    let converted: string[] | undefined
+    if (newText !== text && (newText.toUpperCase() === text.toUpperCase()
+      || newText.toLowerCase() === text.toLowerCase()
+      || (text !== text.toUpperCase() && newText === newText.toUpperCase())
+      || (text !== text.toLowerCase() && newText === newText.toLowerCase()))) {
+      // Use the editor's Unicode case conversion, which differs from JavaScript
+      // for characters such as sharp s and dotted capital I.
+      let cases = await this.nvim.call('map', [ranges.map(r => r.text), '[toupper(v:val), tolower(v:val)]']) as [string, string][]
+      if (!this.activated || !this.doc) return
+      if (doc.version !== version || ranges.length !== this.ranges.length
+        || ranges.some((r, i) => r !== this.ranges[i])) {
+        this.cancel()
+        return
+      }
+      // All-uppercase/lowercase replacement text alone is not sufficient.
+      let source = cases[ranges.indexOf(textRange)]
+      if (source[0] === newText) converted = cases.map(pair => pair[0])
+      else if (source[1] === newText) converted = cases.map(pair => pair[1])
+    }
     let after = ranges.filter(r => r !== textRange && r.position.line == textRange.position.line)
     after.forEach(r => r.adjustFromEdit(edit))
     let change = getChange(textRange, edit.range, edit.newText)
-    let delta = getDelta(change)
-    ranges.forEach(r => r.applyChange(change))
+    let deltas = ranges.map((r, i) => {
+      let length = r.text.length
+      if (converted) {
+        r.applyTextChange({ offset: 0, remove: length, insert: converted[i] })
+      } else {
+        r.applyChange(change)
+      }
+      return r.text.length - length
+    })
     let edits = ranges.filter(r => r !== textRange).map(o => o.textEdit)
     this.changing = true
-    await doc.applyEdits(edits, true, true)
-    this.changing = false
-    if (delta != 0) {
-      for (let r of ranges) {
-        let n = getBeforeCount(r, this.ranges, textRange)
-        r.move(n * delta)
-      }
+    try {
+      await doc.applyEdits(edits, true, true)
+    } finally {
+      this.changing = false
+    }
+    if (!this.activated || !this.doc) return
+    // Each selected word can have a different length change.
+    let offset = 0
+    for (let i = 0; i < ranges.length; i++) {
+      let r = ranges[i]
+      if (i == 0 || r.line !== ranges[i - 1].line) offset = 0
+      r.move(offset)
+      if (r !== textRange) offset += deltas[i]
     }
     this.doHighlights()
   }
