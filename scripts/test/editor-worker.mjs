@@ -195,6 +195,7 @@ function createEditorSession() {
     nvim.command('stopinsert', true)
     nvim.call('coc#float#close_all', [], true)
     nvim.command('silent! %bwipeout! | setl nopreviewwindow', true)
+    nvim.command("let v:errmsg = ''", true)
     await nvim.resumeNotification()
     await workspace.document
   }
