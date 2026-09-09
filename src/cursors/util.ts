@@ -2,7 +2,6 @@
 import { Range } from 'vscode-languageserver-types'
 import Document from '../model/document'
 import { equals } from '../util/object'
-import { toText } from '../util/string'
 import { getWellformedRange } from '../util/textedit'
 import type TextRange from './textRange'
 
@@ -32,13 +31,22 @@ export interface SurroundChange {
  * Split to single line ranges
  */
 export function splitRange(doc: Document, range: Range): Range[] {
+  let { start, end } = range
+  if (start.line === end.line) {
+    return start.character === end.character ? [] : [Range.create(start.line, start.character, end.line, end.character)]
+  }
   let splited: Range[] = []
-  for (let i = range.start.line; i <= range.end.line; i++) {
-    let curr = toText(doc.getline(i))
-    let sc = i == range.start.line ? range.start.character : 0
-    let ec = i == range.end.line ? range.end.character : curr.length
-    if (sc == ec) continue
-    splited.push(Range.create(i, sc, i, ec))
+  let startLength = doc.getline(start.line).length
+  if (start.character !== startLength) {
+    splited.push(Range.create(start.line, start.character, start.line, startLength))
+  }
+  for (let i = start.line + 1; i < end.line; i++) {
+    let curr = doc.getline(i)
+    if (curr.length === 0) continue
+    splited.push(Range.create(i, 0, i, curr.length))
+  }
+  if (end.character !== 0) {
+    splited.push(Range.create(end.line, 0, end.line, end.character))
   }
   return splited
 }
