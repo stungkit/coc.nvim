@@ -531,8 +531,8 @@ async function triggerAutocmd(id: number): Promise<void> {
 }
 
 describe('setupDynamicAutocmd()', () => {
-  afterEach(() => {
-    nvim.command(`autocmd! coc_dynamic_autocmd`, true)
+  afterEach(async () => {
+    await nvim.command(`autocmd! coc_dynamic_autocmd`)
   })
 
   it('should create command', t => {
