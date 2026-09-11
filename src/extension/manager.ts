@@ -9,6 +9,7 @@ import { disposeAll, wait } from '../util'
 import { splitArray, toArray } from '../util/array'
 import { configHome, dataHome } from '../util/constants'
 import { onUnexpectedError } from '../util/errors'
+import { extensionContext } from '../util/extensionId'
 import { Extensions as ExtensionsInfo, IExtensionRegistry, IStringDictionary, getProperties } from '../util/extensionRegistry'
 import { isDirectory, loadJson, remove, statAsync, watchFile } from '../util/fs'
 import * as Is from '../util/is'
@@ -486,7 +487,7 @@ export class ExtensionManager {
           timing.start()
           try {
             let isEmpty = typeof packageJSON.engines.coc === 'undefined'
-            ext = await createExtensionAsync(id, filename, isEmpty, options, subscriptions)
+            ext = await extensionContext.run(id, () => createExtensionAsync(id, filename, isEmpty, options, subscriptions))
             let context = {
               subscriptions,
               extensionPath,
@@ -496,7 +497,7 @@ export class ExtensionManager {
               storagePath: path.join(this.folder, `${id}-data`),
               logger: createLogger(`extension:${id}`)
             }
-            let res = await Promise.resolve(ext.activate(context))
+            let res = await extensionContext.run(id, () => ext.activate(context))
             isActive = true
             exports = res
             this._onDidActiveExtension.fire(extension)
@@ -541,7 +542,7 @@ export class ExtensionManager {
         disposeExtension(id)
         if (ext && typeof ext.deactivate === 'function') {
           try {
-            await Promise.resolve(ext.deactivate())
+            await Promise.resolve(extensionContext.run(id, () => ext.deactivate()))
             ext = undefined
           } catch (e) {
             logger.error(`Error on ${id} deactivate: `, e)

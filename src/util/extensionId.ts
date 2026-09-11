@@ -1,4 +1,8 @@
 'use strict'
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+// Shared with the global error handlers; stores only the owning extension id.
+export const extensionContext = new AsyncLocalStorage<string>()
 
 /**
  * Symbol used to tag registration callbacks (command handlers, event
@@ -43,7 +47,7 @@ export function wrapCallbackWithExtension<T extends (...args: any[]) => any>(
 ): T {
   const wrapped = function (this: unknown, ...args: any[]) {
     try {
-      const res = (callback as (...a: any[]) => any).apply(this, args)
+      const res = extensionContext.run(extensionId, () => callback.apply(this, args))
       if (res != null && typeof (res as unknown as Promise<unknown>).then === 'function') {
         return Promise.resolve(res).catch(e => {
           throw prefixExtensionError(e, extensionId)

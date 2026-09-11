@@ -4,7 +4,7 @@ import path from 'path'
 import { createExtensionApi, SHARED_VALUE_EXPORTS, WRAPPED_SINGLETONS } from '../../extension/facade'
 import type { ExtensionApiContext } from '../../extension/facade'
 import { consoleLogger, createExtensionRuntime } from '../../extension/loader'
-import { getExtensionId, prefixExtensionError, setExtensionId, wrapCallbackWithExtension } from '../../util/extensionId'
+import { extensionContext, getExtensionId, prefixExtensionError, setExtensionId, wrapCallbackWithExtension } from '../../util/extensionId'
 import { Disposable } from '../../util/protocol'
 import * as coreApi from '../../index'
 
@@ -232,6 +232,23 @@ describe('extension api facade', () => {
       throw new Error('async boom')
     }, 'plugin-a')
     await assert.rejects(rejecting(), /\[extension: plugin-a\] async boom/)
+  })
+
+  it('should preserve independent extension contexts in asynchronous callback work', async () => {
+    const callbacks = ['plugin-a', 'plugin-b'].map(id => wrapCallbackWithExtension(function (this: { value: number }) {
+      assert.strictEqual(this.value, 42)
+      return new Promise<string | undefined>(resolve => {
+        setTimeout(() => resolve(extensionContext.getStore()), 0)
+      })
+    }, id))
+    const pending = extensionContext.run('caller', () => {
+      const results = callbacks.map(callback => callback.call({ value: 42 }))
+      assert.strictEqual(extensionContext.getStore(), 'caller')
+      return results
+    })
+    assert.strictEqual(extensionContext.getStore(), undefined)
+    assert.deepStrictEqual(await Promise.all(pending), ['plugin-a', 'plugin-b'])
+    assert.strictEqual(extensionContext.getStore(), undefined)
   })
 
   it('should tag objects and tolerate frozen targets', () => {

@@ -21,6 +21,7 @@ let entryPlugin = {
       let contents = `'use strict'
 if (global.__isMain) {
   const { createLogger } = require('./src/logger/index')
+  const { extensionContext } = require('./src/util/extensionId')
   const logger = createLogger('server')
   Object.defineProperty(console, 'log', {
     value() {
@@ -28,9 +29,11 @@ if (global.__isMain) {
     }
   })
   process.on('uncaughtException', function(err) {
-    let msg = 'Uncaught exception: ' + err.message
+    const id = extensionContext.getStore()
+    const owner = id ? '[extension: ' + id + '] ' : ''
+    let msg = owner + 'Uncaught exception: ' + err.message
     console.error(msg)
-    logger.error('uncaughtException', err.stack)
+    logger.error(owner + 'uncaughtException', err)
   })
   process.on('unhandledRejection', function(reason, p) {
     if (reason instanceof Error) {
@@ -47,7 +50,8 @@ if (global.__isMain) {
     } else {
       console.error('UnhandledRejection: ' + reason)
     }
-    logger.error('unhandledRejection ', p, reason)
+    const id = extensionContext.getStore()
+    logger.error((id ? '[extension: ' + id + '] ' : '') + 'unhandledRejection ', p, reason)
   })
   const attach = require('./src/attach').default
   attach({ reader: process.stdin, writer: process.stdout })
