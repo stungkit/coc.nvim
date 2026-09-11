@@ -2,6 +2,12 @@
 
 Notable changes of coc.nvim:
 
+## 2026-09-11
+
+- Fix inline completion's `line` acceptance inserting the entire suggestion.
+  Add `line+indent` to `coc#inline#accept()` to accept the first line plus the
+  following newline and indentation (#5756).
+
 ## 2026-09-08
 
 - Fix multi-cursor uppercase and lowercase conversion overwriting different

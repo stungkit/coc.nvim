@@ -434,7 +434,7 @@ describe('InlineCompletion', () => {
       await inlineCompletion.accept(doc.bufnr, 'line')
       assert.strictEqual(inlineCompletion.session, undefined)
       const content = await doc.buffer.lines
-      assert.strictEqual(content[0], 'prefix firstLine')
+      assert.deepStrictEqual(content, ['prefix firstLine'])
     })
 
     it('should accept line as kind with single line insertText', async t => {
@@ -454,6 +454,39 @@ describe('InlineCompletion', () => {
       const content = await doc.buffer.lines
       assert.strictEqual(content[0], 'prefix singleLineText')
     })
+
+    for (const { name, text, accepted } of [
+      { name: 'spaces', text: 'firstLine\n  secondLine\nthirdLine', accepted: 'firstLine\n  ' },
+      { name: 'tabs', text: 'firstLine\n\t\tsecondLine', accepted: 'firstLine\n\t\t' },
+      { name: 'no indentation', text: 'firstLine\nsecondLine', accepted: 'firstLine\n' },
+      { name: 'a single line', text: 'singleLine', accepted: 'singleLine' },
+      { name: 'an empty next line', text: 'firstLine\n\nthirdLine', accepted: 'firstLine\n' },
+      { name: 'a trailing newline', text: 'firstLine\n', accepted: 'firstLine\n' },
+      { name: 'an empty first line', text: '\n  secondLine', accepted: '\n  ' }
+    ]) {
+      it(`should accept line+indent with ${name}`, async t => {
+        let doc = await workspace.document
+        await nvim.command('startinsert')
+        await nvim.setLine('prefix suffix')
+        await doc.patchChange()
+        const item: InlineCompletionItem = { insertText: text }
+        inlineCompletion.session = new InlineSession(doc.bufnr, Position.create(0, 7), [item])
+        inlineCompletion.session.vtext = text
+        const fireSpy = t.mock.method(events, 'fire')
+
+        const result = await shared.doAction('inlineAccept', doc.bufnr, 'line+indent')
+
+        assert.strictEqual(result, true)
+        assert.strictEqual(inlineCompletion.session, undefined)
+        assert.deepStrictEqual(await doc.buffer.lines, (`prefix ${accepted}suffix`).split('\n'))
+        const lines = accepted.split('\n')
+        const character = lines.length === 1 ? 7 + accepted.length : lines[lines.length - 1].length
+        assert.deepStrictEqual(await window.getCursorPosition(), Position.create(lines.length - 1, character))
+        const acceptCalls = fireSpy.mock.calls.filter(call => call.arguments[0] === 'InlineAccept')
+        assert.strictEqual(acceptCalls.length, 1)
+        assert.deepStrictEqual(acceptCalls[0].arguments[1], [accepted.length, item])
+      })
+    }
 
     it('should not throw when completion command throws error', async t => {
       let doc = await workspace.document
